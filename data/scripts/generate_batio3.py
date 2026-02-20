@@ -53,7 +53,7 @@ BTO_TETRA_C = 4.038
 # Debye-Waller factors for BaTiO3
 BTO_PHONON_SIGMAS = {
     "Ba": 0.080,
-    "Ti": 0.055,
+    "Ti": 0.080,
     "O": 0.090,
 }
 

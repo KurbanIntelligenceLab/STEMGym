@@ -51,7 +51,7 @@ GE_A = 5.658  # Angstrom, diamond cubic
 # Debye-Waller factors
 SIGE_PHONON_SIGMAS = {
     "Si": 0.078,
-    "Ge": 0.065,
+    "Ge": 0.085,
 }
 
 # Difficulty controls interface sharpness and Ge gradient

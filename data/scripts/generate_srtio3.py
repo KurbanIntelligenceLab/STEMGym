@@ -48,7 +48,7 @@ from sim_utils import (
 STO_A = 3.905  # Angstrom, cubic perovskite
 
 # Debye-Waller factors (RMS displacement in Angstrom) for SrTiO3
-# From: Peng et al., Acta Crystallographica A, 1996
+# From: Abramov et al., Acta Cryst. B 51, 942-951, 1995 (values at 296 K)
 STO_PHONON_SIGMAS = {
     "Sr": 0.084,
     "Ti": 0.060,
