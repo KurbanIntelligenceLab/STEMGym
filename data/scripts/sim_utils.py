@@ -53,7 +53,7 @@ class SimConfig:
     overlap_px: int = 4
 
     # Simulation tiling (for large FOVs that don't fit in GPU memory)
-    sim_tile_nm: float = 10.0  # tile size for PRISM sub-simulations (nm)
+    sim_tile_nm: float = 7.0  # tile size for PRISM sub-simulations (nm)
     sim_tile_overlap_nm: float = 1.0  # overlap between sim tiles (nm)
 
     # Output
@@ -367,7 +367,7 @@ def _run_single_tile_simulation(
         potential=potential,
         interpolation=interpolation,
         device=config.device,
-        store_on_host=(config.device == "gpu"),
+        store_on_host=False,
     )
 
     flex_detector = abtem.FlexibleAnnularDetector(
