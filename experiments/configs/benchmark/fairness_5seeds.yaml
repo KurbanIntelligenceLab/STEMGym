@@ -1,0 +1,29 @@
+# Fairness comparison at budget=5000
+# All equipped agents share the same Analyst for fair comparison.
+
+name: fairness_5seeds
+
+agents:
+  - raster_equipped
+  - gp_ucb_equipped
+  - stem_agent
+  - no_planner
+  - no_uncertainty
+
+tasks:
+  - defect_census
+  - phase_mapping
+  - targeted
+
+worlds:
+  - srtio3_medium
+  - batio3_medium
+  - sige_medium
+  - test_world
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/benchmark/fairness_5seeds.json

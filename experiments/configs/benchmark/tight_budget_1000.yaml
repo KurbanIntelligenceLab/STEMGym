@@ -1,0 +1,24 @@
+# Extreme budget at budget=1000
+
+name: tight_budget_1000
+
+agents:
+  - raster_equipped
+  - gp_ucb_equipped
+  - stem_agent
+  - no_planner
+
+tasks:
+  - defect_census
+  - targeted
+
+worlds:
+  - srtio3_medium
+  - sige_medium
+
+seeds: 5
+budget: 1000.0
+max_steps: 100
+score_every_n_acquires: 2
+
+output: results/benchmark/tight_budget_1000.json

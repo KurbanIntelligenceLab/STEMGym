@@ -1,0 +1,25 @@
+# Clustered worlds — extreme budget at 1000
+# Requires clustered world generation first.
+
+name: clustered_extreme_1000
+
+agents:
+  - raster_equipped
+  - gp_ucb_equipped
+  - stem_agent
+  - no_planner
+
+tasks:
+  - defect_census
+  - targeted
+
+worlds:
+  - srtio3_clustered
+  - sige_gradient_clustered
+
+seeds: 5
+budget: 1000.0
+max_steps: 100
+score_every_n_acquires: 2
+
+output: results/benchmark/clustered_extreme_1000.json
