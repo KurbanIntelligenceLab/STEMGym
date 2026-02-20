@@ -167,6 +167,75 @@ def plant_vacancies(
     return modified, vacancy_indices
 
 
+def plant_vacancies_weighted(
+    atoms: Atoms,
+    species: str,
+    rate: float,
+    weights: np.ndarray,
+    rng: np.random.Generator,
+    cluster_fraction: float = 0.7,
+) -> tuple[Atoms, np.ndarray]:
+    """Remove atoms to create vacancies, biased by per-atom weights.
+
+    Splits total vacancies into clustered (sampled proportional to weights)
+    and background (uniform from remaining atoms).
+
+    Args:
+        atoms: Input structure.
+        species: Chemical symbol to create vacancies for (e.g. "O").
+        rate: Fraction of atoms of that species to remove.
+        weights: Per-species-atom array (higher = more likely to be a vacancy).
+                 Must have length equal to the number of atoms of `species`.
+        rng: Random number generator.
+        cluster_fraction: Fraction of vacancies drawn from weighted distribution.
+
+    Returns:
+        (modified_atoms, vacancy_indices) — indices are into the ORIGINAL atoms.
+    """
+    symbols = np.array(atoms.get_chemical_symbols())
+    species_mask = symbols == species
+    species_indices = np.where(species_mask)[0]
+
+    if len(weights) != len(species_indices):
+        raise ValueError(
+            f"weights length ({len(weights)}) != number of {species} atoms "
+            f"({len(species_indices)})"
+        )
+
+    n_vacancies = max(1, int(len(species_indices) * rate))
+    n_clustered = int(n_vacancies * cluster_fraction)
+    n_background = n_vacancies - n_clustered
+
+    # --- Clustered vacancies: sample proportional to weights ---
+    w = np.asarray(weights, dtype=np.float64)
+    w_sum = w.sum()
+    if w_sum > 0:
+        prob = w / w_sum
+    else:
+        prob = np.ones(len(w)) / len(w)
+
+    clustered_local = rng.choice(len(species_indices), size=n_clustered, replace=False, p=prob)
+    chosen_set = set(clustered_local.tolist())
+
+    # --- Background vacancies: uniform from remainder ---
+    remaining_local = np.array([i for i in range(len(species_indices)) if i not in chosen_set])
+    if n_background > 0 and len(remaining_local) > 0:
+        n_background = min(n_background, len(remaining_local))
+        bg_local = rng.choice(remaining_local, size=n_background, replace=False)
+        all_local = np.concatenate([clustered_local, bg_local])
+    else:
+        all_local = clustered_local
+
+    vacancy_indices = species_indices[all_local]
+
+    # Remove atoms
+    keep_mask = np.ones(len(atoms), dtype=bool)
+    keep_mask[vacancy_indices] = False
+    modified = atoms[keep_mask]
+
+    return modified, vacancy_indices
+
+
 def plant_substitutions(
     atoms: Atoms,
     original_species: str,
