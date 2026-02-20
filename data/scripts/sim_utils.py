@@ -470,13 +470,19 @@ def run_stem_simulation(
         f"overlap={overlap_ang:.0f} Å"
     )
 
-    # Output image size
-    full_px_x = int(round(extent_x / config.sampling))
-    full_px_y = int(round(extent_y / config.sampling))
+    # PRISM output pixel size: sampling * interpolation
+    interpolation = config.interpolation
+    if config.device == "gpu":
+        interpolation = max(interpolation, 4)
+    output_sampling = config.sampling * interpolation  # Angstrom per output pixel
+
+    # Output image size (at PRISM output resolution)
+    full_px_x = int(round(extent_x / output_sampling))
+    full_px_y = int(round(extent_y / output_sampling))
     image = np.zeros((full_px_y, full_px_x), dtype=np.float64)
     weights = np.zeros((full_px_y, full_px_x), dtype=np.float64)
 
-    overlap_px = int(round(overlap_ang / config.sampling))
+    overlap_px = int(round(overlap_ang / output_sampling))
 
     for ti in range(n_tiles_x):
         for tj in range(n_tiles_y):
@@ -493,9 +499,9 @@ def run_stem_simulation(
             tile_atoms = _crop_atoms_xy(atoms, x0, y0, tile_x, tile_y)
             tile_image = _run_single_tile_simulation(tile_atoms, config)
 
-            # Map tile pixels into the full image
-            px_x0 = int(round(x0 / config.sampling))
-            px_y0 = int(round(y0 / config.sampling))
+            # Map tile pixels into the full image (using output pixel size)
+            px_x0 = int(round(x0 / output_sampling))
+            px_y0 = int(round(y0 / output_sampling))
             th, tw = tile_image.shape
 
             # Build blend weights for this tile
@@ -556,7 +562,11 @@ def write_world_hdf5(
     from scipy.ndimage import zoom as scipy_zoom
 
     if pixel_size_nm is None:
-        pixel_size_nm = config.sampling / 10.0  # Angstrom -> nm
+        # Use PRISM output pixel size (sampling * interpolation)
+        interpolation = config.interpolation
+        if config.device == "gpu":
+            interpolation = max(interpolation, 4)
+        pixel_size_nm = (config.sampling * interpolation) / 10.0  # Angstrom -> nm
 
     h, w = image.shape
     tile_size = config.tile_size_px
