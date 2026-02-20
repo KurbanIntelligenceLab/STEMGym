@@ -46,6 +46,10 @@ notebooks/
 # Figures (generated)
 figures/
 
+# SSH deploy keys
+scripts/vastai_deploy_key
+scripts/vastai_deploy_key.pub
+
 # Local-only files
 CLAUDE.md
 hf_dataset_card.md
