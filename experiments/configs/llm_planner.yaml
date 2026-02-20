@@ -1,0 +1,26 @@
+# LLM Planner Comparison
+# Compare rule-based vs LLM planner (requires OPENROUTER_API_KEY)
+# Without API key, llm_planner falls back to rule-based
+
+name: llm_planner_comparison
+
+agents:
+  - stem_agent
+  - llm_planner
+  - rule_planner
+  - no_planner
+
+tasks:
+  - defect_census
+  - phase_mapping
+
+worlds:
+  - test_world
+  - srtio3_test_mini
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/llm_planner.json

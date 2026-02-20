@@ -1,0 +1,22 @@
+# Quick Smoke Test
+# Runs fast to verify everything works. Use before long runs.
+
+name: smoke_test
+
+agents:
+  - random
+  - raster
+  - stem_agent
+
+tasks:
+  - defect_census
+
+worlds:
+  - test_world
+
+seeds: 2
+budget: 3000.0
+max_steps: 100
+score_every_n_acquires: 3
+
+output: results/smoke.json
