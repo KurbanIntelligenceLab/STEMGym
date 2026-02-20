@@ -498,20 +498,23 @@ def run_stem_simulation(
             px_y0 = int(round(y0 / config.sampling))
             th, tw = tile_image.shape
 
-            # Build cosine blend weights for this tile
+            # Build blend weights for this tile
             w = np.ones_like(tile_image, dtype=np.float64)
-            if overlap_px > 0:
-                ramp = np.linspace(0, 1, overlap_px)
-                # Left/right fade
+            # Clamp overlap to actual tile dims
+            olap_w = min(overlap_px, tw // 3) if overlap_px > 0 else 0
+            olap_h = min(overlap_px, th // 3) if overlap_px > 0 else 0
+            if olap_w > 0:
+                ramp_w = np.linspace(0, 1, olap_w)
                 if ti > 0:
-                    w[:, :overlap_px] *= ramp[np.newaxis, :]
+                    w[:, :olap_w] *= ramp_w[np.newaxis, :]
                 if ti < n_tiles_x - 1:
-                    w[:, -overlap_px:] *= ramp[np.newaxis, ::-1]
-                # Top/bottom fade
+                    w[:, -olap_w:] *= ramp_w[np.newaxis, ::-1]
+            if olap_h > 0:
+                ramp_h = np.linspace(0, 1, olap_h)
                 if tj > 0:
-                    w[:overlap_px, :] *= ramp[:, np.newaxis]
+                    w[:olap_h, :] *= ramp_h[:, np.newaxis]
                 if tj < n_tiles_y - 1:
-                    w[-overlap_px:, :] *= ramp[::-1, np.newaxis]
+                    w[-olap_h:, :] *= ramp_h[::-1, np.newaxis]
 
             # Accumulate
             py_end = min(px_y0 + th, full_px_y)
