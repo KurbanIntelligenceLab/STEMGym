@@ -48,9 +48,13 @@ class SimConfig:
     num_phonon_configs: int = 8
     phonon_sigmas: dict[str, float] = field(default_factory=dict)
 
-    # Tiling
+    # Tiling (HDF5 output)
     tile_size_px: int = 128
     overlap_px: int = 4
+
+    # Simulation tiling (for large FOVs that don't fit in GPU memory)
+    sim_tile_nm: float = 5.0  # tile size for PRISM sub-simulations (nm)
+    sim_tile_overlap_nm: float = 1.0  # overlap between sim tiles (nm)
 
     # Output
     seed: int = 42
@@ -329,22 +333,16 @@ def record_ground_truth(
 # abTEM simulation
 # ---------------------------------------------------------------------------
 
-def run_stem_simulation(
+def _run_single_tile_simulation(
     atoms: Atoms,
     config: SimConfig,
 ) -> np.ndarray:
-    """Run PRISM STEM-HAADF simulation.
+    """Run PRISM STEM-HAADF on a single (small) structure tile.
 
-    Args:
-        atoms: Structure (with or without frozen phonons already applied).
-        config: Simulation configuration.
-
-    Returns:
-        HAADF image as (H, W) float32 numpy array.
+    The structure must be small enough that the S-matrix fits in memory.
     """
     import abtem
 
-    logger.info("Building frozen phonons...")
     frozen = abtem.FrozenPhonons(
         atoms,
         num_configs=config.num_phonon_configs,
@@ -352,7 +350,6 @@ def run_stem_simulation(
         seed=config.seed,
     )
 
-    logger.info("Building potential...")
     potential = abtem.Potential(
         frozen,
         sampling=config.sampling,
@@ -360,36 +357,31 @@ def run_stem_simulation(
         device=config.device,
     )
 
-    logger.info("Building S-matrix (PRISM)...")
+    interpolation = config.interpolation
+    if config.device == "gpu":
+        interpolation = max(interpolation, 4)
+
     s_matrix = abtem.SMatrix(
         semiangle_cutoff=config.semiangle_cutoff,
         energy=config.energy_eV,
         potential=potential,
-        interpolation=config.interpolation,
+        interpolation=interpolation,
         device=config.device,
+        store_on_host=(config.device == "gpu"),
     )
 
-    logger.info("Setting up detector...")
-    # Use FlexibleAnnularDetector to get radially-resolved diffraction,
-    # then integrate over HAADF range. This avoids max-angle issues
-    # since we can clamp post-hoc.
     flex_detector = abtem.FlexibleAnnularDetector(
         step_size=1.0,
         inner=0.0,
-        outer=None,  # auto: use max available angle
+        outer=None,
     )
 
-    logger.info("Running PRISM scan...")
     scan = abtem.GridScan()
     measurement = s_matrix.scan(scan, detectors=flex_detector)
 
-    # Compute if lazy (dask-backed)
     if hasattr(measurement, "compute"):
-        logger.info("Computing measurement (may be lazy/dask)...")
         measurement = measurement.compute()
 
-    # Clamp HAADF angles to available range, then integrate
-    # The angular axis is the last axis of FlexibleAnnularDetector output
     angle_axis = [ax for ax in measurement.axes_metadata if hasattr(ax, "offset")]
     if angle_axis:
         ax = angle_axis[-1]
@@ -399,18 +391,141 @@ def run_stem_simulation(
 
     haadf_inner = min(config.haadf_inner, max_avail * 0.9)
     haadf_outer = min(config.haadf_outer, max_avail)
-    if haadf_outer < config.haadf_outer:
-        logger.warning(
-            f"Clamping HAADF outer from {config.haadf_outer:.0f} to "
-            f"{haadf_outer:.0f} mrad (max available: {max_avail:.0f} mrad)"
-        )
-    logger.info(f"Integrating HAADF: {haadf_inner:.0f}-{haadf_outer:.0f} mrad...")
     haadf = measurement.integrate_radial(inner=haadf_inner, outer=haadf_outer)
 
     image = np.array(haadf.array, dtype=np.float32)
     if image.ndim > 2:
-        # Average over frozen phonon configs if not already done
         image = np.mean(image, axis=tuple(range(image.ndim - 2)))
+
+    return image.astype(np.float32)
+
+
+def _crop_atoms_xy(atoms: Atoms, x0: float, y0: float,
+                   lx: float, ly: float) -> Atoms:
+    """Crop atoms to a rectangular region in XY, creating a new cell."""
+    positions = atoms.get_positions()
+    mask = (
+        (positions[:, 0] >= x0) & (positions[:, 0] < x0 + lx)
+        & (positions[:, 1] >= y0) & (positions[:, 1] < y0 + ly)
+    )
+    cropped = atoms[mask]
+    new_positions = cropped.get_positions()
+    new_positions[:, 0] -= x0
+    new_positions[:, 1] -= y0
+    cell = atoms.cell.array.copy()
+    cell[0, 0] = lx
+    cell[1, 1] = ly
+    cropped.set_cell(cell)
+    cropped.set_positions(new_positions)
+    cropped.set_pbc(atoms.pbc)
+    return cropped
+
+
+def run_stem_simulation(
+    atoms: Atoms,
+    config: SimConfig,
+) -> np.ndarray:
+    """Run PRISM STEM-HAADF simulation, tiling if the structure is too large.
+
+    For structures larger than ``config.sim_tile_nm``, the XY plane is
+    divided into overlapping tiles, each simulated independently, then
+    blended together with cosine-weighted overlap.
+
+    Args:
+        atoms: Structure (with or without frozen phonons already applied).
+        config: Simulation configuration.
+
+    Returns:
+        HAADF image as (H, W) float32 numpy array.
+    """
+    cell = atoms.cell.array
+    extent_x = cell[0, 0]  # Angstrom
+    extent_y = cell[1, 1]
+
+    tile_ang = config.sim_tile_nm * 10.0
+    overlap_ang = config.sim_tile_overlap_nm * 10.0
+
+    needs_tiling = (extent_x > tile_ang * 1.5) or (extent_y > tile_ang * 1.5)
+
+    if not needs_tiling:
+        logger.info("Structure fits in single tile, running directly...")
+        return _run_single_tile_simulation(atoms, config)
+
+    # --- Tiled simulation ---
+    stride_ang = tile_ang - overlap_ang
+
+    n_tiles_x = max(1, int(np.ceil((extent_x - overlap_ang) / stride_ang)))
+    n_tiles_y = max(1, int(np.ceil((extent_y - overlap_ang) / stride_ang)))
+
+    # Recompute tile_ang to cover the full extent evenly
+    tile_x = (extent_x + overlap_ang * (n_tiles_x - 1)) / n_tiles_x if n_tiles_x > 1 else extent_x
+    tile_y = (extent_y + overlap_ang * (n_tiles_y - 1)) / n_tiles_y if n_tiles_y > 1 else extent_y
+    stride_x = tile_x - overlap_ang if n_tiles_x > 1 else extent_x
+    stride_y = tile_y - overlap_ang if n_tiles_y > 1 else extent_y
+
+    total_tiles = n_tiles_x * n_tiles_y
+    logger.info(
+        f"Tiling simulation: {n_tiles_x}x{n_tiles_y} = {total_tiles} tiles, "
+        f"tile={tile_x:.0f}x{tile_y:.0f} Å, stride={stride_x:.0f}x{stride_y:.0f} Å, "
+        f"overlap={overlap_ang:.0f} Å"
+    )
+
+    # Output image size
+    full_px_x = int(round(extent_x / config.sampling))
+    full_px_y = int(round(extent_y / config.sampling))
+    image = np.zeros((full_px_y, full_px_x), dtype=np.float64)
+    weights = np.zeros((full_px_y, full_px_x), dtype=np.float64)
+
+    overlap_px = int(round(overlap_ang / config.sampling))
+
+    for ti in range(n_tiles_x):
+        for tj in range(n_tiles_y):
+            tile_idx = ti * n_tiles_y + tj + 1
+            x0 = ti * stride_x
+            y0 = tj * stride_y
+            # Clamp to extent
+            x0 = min(x0, extent_x - tile_x)
+            y0 = min(y0, extent_y - tile_y)
+
+            logger.info(f"  Tile {tile_idx}/{total_tiles}: "
+                        f"origin=({x0:.0f}, {y0:.0f}) Å")
+
+            tile_atoms = _crop_atoms_xy(atoms, x0, y0, tile_x, tile_y)
+            tile_image = _run_single_tile_simulation(tile_atoms, config)
+
+            # Map tile pixels into the full image
+            px_x0 = int(round(x0 / config.sampling))
+            px_y0 = int(round(y0 / config.sampling))
+            th, tw = tile_image.shape
+
+            # Build cosine blend weights for this tile
+            w = np.ones_like(tile_image, dtype=np.float64)
+            if overlap_px > 0:
+                ramp = np.linspace(0, 1, overlap_px)
+                # Left/right fade
+                if ti > 0:
+                    w[:, :overlap_px] *= ramp[np.newaxis, :]
+                if ti < n_tiles_x - 1:
+                    w[:, -overlap_px:] *= ramp[np.newaxis, ::-1]
+                # Top/bottom fade
+                if tj > 0:
+                    w[:overlap_px, :] *= ramp[:, np.newaxis]
+                if tj < n_tiles_y - 1:
+                    w[-overlap_px:, :] *= ramp[::-1, np.newaxis]
+
+            # Accumulate
+            py_end = min(px_y0 + th, full_px_y)
+            px_end = min(px_x0 + tw, full_px_x)
+            sh = py_end - px_y0
+            sw = px_end - px_x0
+            image[px_y0:py_end, px_x0:px_end] += tile_image[:sh, :sw] * w[:sh, :sw]
+            weights[px_y0:py_end, px_x0:px_end] += w[:sh, :sw]
+
+            logger.info(f"  Tile {tile_idx}/{total_tiles} complete.")
+
+    # Normalize by weights
+    mask = weights > 0
+    image[mask] /= weights[mask]
 
     return image.astype(np.float32)
 

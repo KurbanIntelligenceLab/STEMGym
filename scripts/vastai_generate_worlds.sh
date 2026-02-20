@@ -108,6 +108,7 @@ ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
 git clone git@github.com:KurbanIntelligenceLab/STEMGym.git /workspace/STEMGym
 
 # --- Install dependencies ---
+pip install cupy-cuda12x
 pip install -e "/workspace/STEMGym[sim]"
 
 # --- Set MP_API_KEY ---
@@ -241,7 +242,7 @@ fi
 
 echo "    SSH target: root@$SSH_HOST:$SSH_PORT"
 
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -i $DEPLOY_KEY"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 
 MAX_WAIT_GEN=14400  # 4 hours
 ELAPSED=0
