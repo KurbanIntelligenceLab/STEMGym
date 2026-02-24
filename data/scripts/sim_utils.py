@@ -439,8 +439,9 @@ def run_stem_simulation(
         HAADF image as (H, W) float32 numpy array.
     """
     cell = atoms.cell.array
-    extent_x = cell[0, 0]  # Angstrom
-    extent_y = cell[1, 1]
+    # Use vector norms — permuted cells (e.g. GaN [11-20]) are not diagonal
+    extent_x = float(np.linalg.norm(cell[0]))  # Angstrom
+    extent_y = float(np.linalg.norm(cell[1]))
 
     tile_ang = config.sim_tile_nm * 10.0
     overlap_ang = config.sim_tile_overlap_nm * 10.0

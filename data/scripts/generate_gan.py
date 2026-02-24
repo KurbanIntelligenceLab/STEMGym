@@ -177,9 +177,13 @@ def build_gan_supercell_1120(fov_angstrom: float, z_thickness: float) -> Atoms:
     gan = build_gan_unit_cell()
 
     # Permute: (x,y,z) → (y,z,x)  so that old-x = [2-1-10] becomes beam
+    # The original orthorhombic cell is diagonal, so we build a new diagonal
+    # cell with the axes reordered and positions columns swapped consistently.
     cell = gan.cell.array
-    new_cell = np.array([cell[1], cell[2], cell[0]])
-    new_positions = gan.get_positions()[:, [1, 2, 0]]
+    old_pos = gan.get_positions()
+    # New Cartesian x ← old y ([01-10]), new y ← old z ([0001]), new z ← old x ([2-1-10])
+    new_cell = np.diag([cell[1, 1], cell[2, 2], cell[0, 0]])
+    new_positions = old_pos[:, [1, 2, 0]]
 
     reoriented = Atoms(
         symbols=gan.get_chemical_symbols(),
