@@ -80,14 +80,14 @@ class TestSimUtils:
 
 class TestSrTiO3Generator:
     def test_unit_cell(self):
-        from generate_srtio3 import build_srtio3_unit_cell
+        from generate_srtio3_clustered import build_srtio3_unit_cell
         uc = build_srtio3_unit_cell()
         assert len(uc) == 5  # Sr + Ti + 3 O
         assert set(uc.get_chemical_symbols()) == {"Sr", "Ti", "O"}
 
     def test_pipeline(self, tmp_path):
         import abtem
-        from generate_srtio3 import build_srtio3_unit_cell
+        from generate_srtio3_clustered import build_srtio3_unit_cell
 
         uc = build_srtio3_unit_cell()
         sc = build_supercell(uc, (20.0, 20.0, 40.0))
@@ -115,7 +115,7 @@ class TestSrTiO3Generator:
 
 class TestBaTiO3Generator:
     def test_unit_cells(self):
-        from generate_batio3 import build_batio3_cell
+        from generate_batio3_interface import build_batio3_cell
         cubic = build_batio3_cell("cubic")
         tetra = build_batio3_cell("tetragonal")
         assert len(cubic) == 5
@@ -124,7 +124,7 @@ class TestBaTiO3Generator:
         assert tetra.cell[2, 2] > cubic.cell[2, 2]
 
     def test_phase_map(self):
-        from generate_batio3 import make_phase_boundary_mask
+        from generate_batio3_interface import make_phase_boundary_mask
         rng = np.random.default_rng(42)
         pm = make_phase_boundary_mask((100, 100), n_boundaries=1, waviness=0.0, rng=rng)
         assert pm.shape == (100, 100)
@@ -134,7 +134,7 @@ class TestBaTiO3Generator:
         assert np.sum(pm == 1) > 0
 
     def test_pipeline(self, tmp_path):
-        from generate_batio3 import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
+        from generate_batio3_interface import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
 
         phase_map = make_phase_boundary_mask((100, 100), n_boundaries=1)
         composite, atom_phases = build_composite_structure(20.0, 40.0, phase_map, 0.1)
@@ -161,13 +161,13 @@ class TestBaTiO3Generator:
 
 class TestSiGeGenerator:
     def test_si_110_supercell(self):
-        from generate_sige import build_si_supercell_110
+        from generate_sige_gradient_clustered import build_si_supercell_110
         sc = build_si_supercell_110(20.0, 40.0)
         assert len(sc) > 0
         assert all(s == "Si" for s in sc.get_chemical_symbols())
 
     def test_ge_gradient(self):
-        from generate_sige import build_si_supercell_110, apply_ge_gradient
+        from generate_sige_gradient_clustered import build_si_supercell_110, apply_ge_gradient
         sc = build_si_supercell_110(20.0, 40.0)
         rng = np.random.default_rng(42)
         modified, sub_idx, ge_profile = apply_ge_gradient(
@@ -179,7 +179,7 @@ class TestSiGeGenerator:
         assert len(ge_profile) == 100
 
     def test_pipeline(self, tmp_path):
-        from generate_sige import build_si_supercell_110, apply_ge_gradient, make_interface_phase_map
+        from generate_sige_gradient_clustered import build_si_supercell_110, apply_ge_gradient, make_interface_phase_map
 
         sc = build_si_supercell_110(20.0, 40.0)
         rng = np.random.default_rng(42)
@@ -289,7 +289,7 @@ class TestSrTiO3Clustered:
     pytestmark = []  # Override module-level slow marker for non-pipeline tests
 
     def test_grain_boundary_weights(self):
-        from generate_srtio3 import build_srtio3_unit_cell
+        from generate_srtio3_clustered import build_srtio3_unit_cell
         from generate_srtio3_clustered import compute_grain_boundary_weights
 
         uc = build_srtio3_unit_cell()
@@ -302,7 +302,7 @@ class TestSrTiO3Clustered:
 
     def test_clustering_near_boundary(self):
         """~70% of vacancies should be within 1 sigma of the grain boundary."""
-        from generate_srtio3 import build_srtio3_unit_cell
+        from generate_srtio3_clustered import build_srtio3_unit_cell
         from generate_srtio3_clustered import (
             compute_grain_boundary_weights,
             GB_START, GB_END,
@@ -344,7 +344,7 @@ class TestSrTiO3Clustered:
 
     @pytest.mark.slow
     def test_pipeline(self, tmp_path):
-        from generate_srtio3 import build_srtio3_unit_cell
+        from generate_srtio3_clustered import build_srtio3_unit_cell
         from generate_srtio3_clustered import compute_grain_boundary_weights
 
         uc = build_srtio3_unit_cell()
@@ -374,7 +374,7 @@ class TestBaTiO3Interface:
     pytestmark = []
 
     def test_boundary_distance_weights(self):
-        from generate_batio3 import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
+        from generate_batio3_interface import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
         from generate_batio3_interface import compute_boundary_distance_weights
 
         phase_map = make_phase_boundary_mask((200, 200), n_boundaries=1, waviness=0.0)
@@ -389,7 +389,7 @@ class TestBaTiO3Interface:
 
     def test_defects_near_boundary(self):
         """Defects should be closer to boundary than random expectation."""
-        from generate_batio3 import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
+        from generate_batio3_interface import build_batio3_cell, make_phase_boundary_mask, build_composite_structure
         from generate_batio3_interface import compute_boundary_distance_weights
         from scipy.ndimage import distance_transform_edt
 
@@ -433,7 +433,7 @@ class TestBaTiO3Interface:
 
     @pytest.mark.slow
     def test_pipeline(self, tmp_path):
-        from generate_batio3 import make_phase_boundary_mask, build_composite_structure
+        from generate_batio3_interface import make_phase_boundary_mask, build_composite_structure
         from generate_batio3_interface import compute_boundary_distance_weights
 
         phase_map = make_phase_boundary_mask((100, 100), n_boundaries=1)
@@ -465,7 +465,7 @@ class TestSiGeGradientClustered:
 
     def test_ge_in_target_quadrant(self):
         """~70% of Ge should be in the target quadrant."""
-        from generate_sige import build_si_supercell_110
+        from generate_sige_gradient_clustered import build_si_supercell_110
         from generate_sige_gradient_clustered import (
             apply_ge_gradient_clustered,
             QUADRANT_CENTER,
@@ -514,7 +514,7 @@ class TestSiGeGradientClustered:
         assert np.sum(pm == 2) > 0  # high-Ge core
 
     def test_gradient_output_shape(self):
-        from generate_sige import build_si_supercell_110
+        from generate_sige_gradient_clustered import build_si_supercell_110
         from generate_sige_gradient_clustered import apply_ge_gradient_clustered
 
         sc = build_si_supercell_110(20.0, 30.0)
@@ -530,7 +530,7 @@ class TestSiGeGradientClustered:
 
     @pytest.mark.slow
     def test_pipeline(self, tmp_path):
-        from generate_sige import build_si_supercell_110
+        from generate_sige_gradient_clustered import build_si_supercell_110
         from generate_sige_gradient_clustered import (
             apply_ge_gradient_clustered, make_clustered_phase_map,
         )
@@ -557,6 +557,124 @@ class TestSiGeGradientClustered:
         out = tmp_path / "sige_gradient_clustered_test.h5"
         write_world_hdf5(out, image, gt, config)
         assert out.exists()
+
+
+class TestGaNGenerator:
+    """Tests for the GaN InGaN generator."""
+
+    pytestmark = []  # Override module-level slow marker for non-pipeline tests
+
+    def test_unit_cell(self):
+        from generate_gan import build_gan_unit_cell
+        uc = build_gan_unit_cell()
+        assert len(uc) == 8  # 4 Ga + 4 N (orthorhombic wurtzite cell)
+        assert set(uc.get_chemical_symbols()) == {"Ga", "N"}
+
+    def test_in_substitution(self):
+        from generate_gan import build_gan_supercell_1120, apply_in_substitution
+        sc = build_gan_supercell_1120(50.0, 50.0)
+        rng = np.random.default_rng(42)
+        modified, sub_idx, in_profile = apply_in_substitution(
+            sc, in_fraction=0.12, cluster_fraction=0.75,
+            qw_center_frac=0.65, qw_width_frac=0.10, rng=rng,
+        )
+        assert "In" in modified.get_chemical_symbols()
+        assert len(sub_idx) > 0
+        assert len(in_profile) == 100
+
+    def test_phase_map(self):
+        from generate_gan import make_gan_phase_map
+        pm = make_gan_phase_map((200, 200), qw_center_frac=0.65, qw_width_frac=0.10)
+        assert pm.shape == (200, 200)
+        assert set(np.unique(pm)) == {0, 1, 2}
+        # All three phases should be present
+        assert np.sum(pm == 0) > 0
+        assert np.sum(pm == 1) > 0
+        assert np.sum(pm == 2) > 0
+
+    @pytest.mark.slow
+    def test_pipeline(self, tmp_path):
+        from generate_gan import build_gan_supercell_1120, apply_in_substitution, make_gan_phase_map, GAN_PHONON_SIGMAS
+
+        sc = build_gan_supercell_1120(20.0, 40.0)
+        rng = np.random.default_rng(42)
+        modified, sub_idx, _ = apply_in_substitution(
+            sc, in_fraction=0.12, cluster_fraction=0.75,
+            qw_center_frac=0.65, qw_width_frac=0.10, rng=rng,
+        )
+        gt = record_ground_truth(sc, substitution_indices=sub_idx)
+        gt.phase_map = make_gan_phase_map((100, 100), 0.65, 0.10)
+
+        config = _mini_sim_config(
+            scenario="gan",
+            phonon_sigmas=GAN_PHONON_SIGMAS,
+        )
+        image = run_stem_simulation(modified, config)
+        assert image.ndim == 2
+
+        from scipy.ndimage import zoom as sz
+        gt.phase_map = sz(gt.phase_map, (image.shape[0] / 100, image.shape[1] / 100), order=0).astype(np.int32)
+
+        out = tmp_path / "gan_test.h5"
+        write_world_hdf5(out, image, gt, config)
+        assert out.exists()
+
+
+class TestPtNanoparticlesGenerator:
+    """Tests for the Pt nanoparticle generator."""
+
+    pytestmark = []  # Override module-level slow marker for non-pipeline tests
+
+    def test_wulff_particle(self):
+        from generate_pt_nanoparticles import make_wulff_particle
+        p = make_wulff_particle(55)
+        assert all(s == "Pt" for s in p.get_chemical_symbols())
+        assert len(p) > 10
+
+    def test_icosahedral_particle(self):
+        from generate_pt_nanoparticles import make_icosahedral_particle
+        p = make_icosahedral_particle(55)
+        assert all(s == "Pt" for s in p.get_chemical_symbols())
+        assert len(p) > 10
+
+    def test_decahedral_particle(self):
+        from generate_pt_nanoparticles import make_decahedral_particle
+        p = make_decahedral_particle(55)
+        assert all(s == "Pt" for s in p.get_chemical_symbols())
+        assert len(p) > 10
+
+    def test_amorphous_carbon(self):
+        from generate_pt_nanoparticles import make_amorphous_carbon
+        rng = np.random.default_rng(42)
+        ac = make_amorphous_carbon(50.0, 50.0, 30.0, 2.0, rng)
+        assert all(s == "C" for s in ac.get_chemical_symbols())
+        assert len(ac) > 100
+
+    def test_assembly(self):
+        """Test particle placement + ground truth assembly (no PRISM)."""
+        from generate_pt_nanoparticles import (
+            make_amorphous_carbon, place_particles_on_support,
+            build_particle_ground_truth, PT_DIFFICULTY, MORPH_NAMES,
+        )
+
+        rng = np.random.default_rng(42)
+        fov = 200.0  # 20 nm in Angstrom
+        support = make_amorphous_carbon(fov, fov, 30.0, 2.0, rng)
+
+        pdiff = dict(PT_DIFFICULTY["easy"])
+        pdiff["n_particles"] = 3
+        pdiff["min_sep_nm"] = 3.0
+
+        combined, meta = place_particles_on_support(support, pdiff, fov, rng)
+        assert len(meta) > 0
+        assert "Pt" in combined.get_chemical_symbols()
+
+        gt = build_particle_ground_truth(meta)
+        assert gt.atom_positions_nm.shape == (len(meta), 2)
+        assert len(gt.extra["particle_diameters_nm"]) == len(meta)
+        assert len(gt.extra["particle_morphology_labels"]) == len(meta)
+        for m in meta:
+            assert m["morphology_name"] in MORPH_NAMES.values()
 
 
 class TestEnvIntegration:

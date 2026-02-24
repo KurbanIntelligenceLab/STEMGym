@@ -76,6 +76,10 @@ class Analyst:
         self._all_atom_positions_nm: list[np.ndarray] = []
         self._all_defect_labels: list[str] = []
 
+        # Phase heuristic: track mean intensity per tile for median-split
+        self._phase_intensities: list[float] = []
+        self._phase_tile_keys: list[tuple[int, int]] = []
+
     def reset(self) -> None:
         self._tile_results.clear()
         self._all_atom_positions_nm.clear()
@@ -84,6 +88,8 @@ class Analyst:
         self._defect_clf_pred_counts.clear()
         self._phase_id_check_count = 0
         self._phase_id_pred_counts.clear()
+        self._phase_intensities.clear()
+        self._phase_tile_keys.clear()
 
     @classmethod
     def from_checkpoint(cls, checkpoint_dir: str | Path, device: str = "cpu") -> "Analyst":
@@ -278,15 +284,31 @@ class Analyst:
 
         return labels, confidences
 
-    @staticmethod
-    def _heuristic_phase(tile: np.ndarray) -> tuple[int, float]:
-        """Intensity-based phase heuristic.
+    def _heuristic_phase(self, tile: np.ndarray) -> tuple[int, float]:
+        """Intensity-based phase heuristic via running median split.
 
-        Uses running statistics to classify tiles into two groups by mean
-        intensity. Only meaningful after observing enough tiles; early
-        tiles default to phase 0.
+        Records each tile's mean intensity.  After >=4 tiles, splits at
+        the running median: below → phase 0, above → phase 1.  Early
+        tiles (< 4 observed) default to phase 0.
+
+        The raw labels assigned here may be noise on single-phase worlds.
+        ``get_corrected_tile_phases()`` applies a Cohen's d significance
+        test to decide whether the split is real before exposing it as a
+        phase map.
         """
-        return 0, 0.5
+        mean_intensity = float(tile.mean())
+        self._phase_intensities.append(mean_intensity)
+
+        if len(self._phase_intensities) < 4:
+            return 0, 0.5
+
+        median = float(np.median(self._phase_intensities))
+        label = 0 if mean_intensity <= median else 1
+        # Confidence: distance from median relative to spread
+        spread = max(float(np.std(self._phase_intensities)), 1e-8)
+        conf = min(abs(mean_intensity - median) / spread, 1.0)
+        conf = 0.5 + 0.5 * conf  # scale to [0.5, 1.0]
+        return label, float(conf)
 
     def identify_phase(self, tile: np.ndarray) -> tuple[int, float]:
         """Identify the phase of a tile.
@@ -295,11 +317,11 @@ class Analyst:
             phase_label: int phase index.
             confidence: classification confidence.
 
-        Without a trained model, all tiles get phase 0 — the agent cannot
-        do phase mapping and will correctly score 0.0 on multi-phase worlds.
+        Without a trained model, falls back to adaptive intensity-based
+        median split heuristic.
         """
         if self.phase_identifier is None:
-            return 0, 0.5
+            return self._heuristic_phase(tile)
 
         # Extract center patch
         h, w = tile.shape
@@ -332,7 +354,7 @@ class Analyst:
                 next(iter(self._phase_id_pred_counts)),
             )
             self.phase_identifier = None
-            return 0, 0.5
+            return self._heuristic_phase(tile)
 
         return int(label), float(conf)
 
@@ -341,10 +363,15 @@ class Analyst:
         tile: np.ndarray,
         tile_position_nm: tuple[float, float] | None = None,
         pixel_size_nm: float = 0.005,
+        tile_key: tuple[int, int] | None = None,
     ) -> AnalysisResult:
         """Full analysis pipeline for a single tile.
 
         Same interface as SimpleAnalyst.analyze_tile().
+
+        Args:
+            tile_key: Optional (row, col) grid index. If provided, enables
+                phase correction via ``get_corrected_tile_phases()``.
         """
         if tile.max() <= 0:
             return AnalysisResult(
@@ -360,6 +387,11 @@ class Analyst:
 
         # 3. Identify phase
         phase_label, phase_conf = self.identify_phase(tile)
+
+        # Record tile key for phase correction (must follow identify_phase
+        # since _heuristic_phase appends to _phase_intensities)
+        if tile_key is not None:
+            self._phase_tile_keys.append(tile_key)
 
         # Count defects
         n_vac = int(np.sum(defect_labels == 1))
@@ -418,3 +450,49 @@ class Analyst:
             "mean_atoms_per_tile": np.mean([r.n_atoms for r in self._tile_results]),
             "mean_phase_conf": 0.0,  # TODO: track phase confidences
         }
+
+    def get_corrected_tile_phases(self) -> dict[tuple[int, int], int] | None:
+        """Return tile-level phase labels after bimodality significance test.
+
+        Re-labels all observed tiles using a global median split on mean
+        intensity, then checks whether the intensity distribution is
+        genuinely bimodal using the bimodality coefficient
+        (BC = (skew² + 1) / kurtosis; BC > 5/9 indicates bimodality).
+
+        A median split of a unimodal distribution always produces two
+        groups, but the underlying distribution has low BC (~0.33 for
+        normal).  A genuine two-phase world produces high BC (>0.555).
+
+        Returns:
+            dict mapping (row, col) → phase label (0 or 1), or None if the
+            distribution is unimodal (single-phase world or too few tiles).
+        """
+        if len(self._phase_intensities) < 4 or len(self._phase_tile_keys) < 4:
+            return None
+
+        intensities = np.array(self._phase_intensities)
+        n = len(intensities)
+
+        # Bimodality coefficient: BC = (skew² + 1) / kurtosis
+        # For normal: BC ≈ 0.33; threshold 5/9 ≈ 0.555 indicates bimodality
+        m = intensities.mean()
+        centered = intensities - m
+        var = np.mean(centered**2)
+        if var < 1e-10:
+            return None
+        std = np.sqrt(var)
+        skew = np.mean(centered**3) / std**3
+        kurt = np.mean(centered**4) / std**4  # regular (not excess) kurtosis
+        if kurt < 1e-10:
+            return None
+
+        bc = (skew**2 + 1) / kurt
+        if bc < 5 / 9:
+            return None
+
+        # Distribution is bimodal — re-label all tiles with global median
+        median = float(np.median(intensities))
+        result = {}
+        for intensity, key in zip(self._phase_intensities, self._phase_tile_keys):
+            result[key] = 0 if intensity <= median else 1
+        return result

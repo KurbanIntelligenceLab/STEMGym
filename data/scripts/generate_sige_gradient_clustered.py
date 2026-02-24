@@ -25,6 +25,8 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from ase import Atoms
+from ase.build import bulk, cut
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -33,17 +35,150 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from sim_utils import (
     SimConfig,
+    build_supercell,
     record_ground_truth,
     run_stem_simulation,
     write_world_hdf5,
     DIFFICULTY_PARAMS,
 )
-from generate_sige import (
-    build_si_supercell_110,
-    SI_A,
-    GE_A,
-    SIGE_PHONON_SIGMAS,
-)
+
+# Lattice parameters
+SI_A = 5.431  # Angstrom, diamond cubic
+GE_A = 5.658  # Angstrom, diamond cubic
+
+# Debye-Waller factors
+SIGE_PHONON_SIGMAS = {
+    "Si": 0.078,
+    "Ge": 0.085,
+}
+
+
+def build_si_supercell_110(fov_angstrom: float, z_thickness: float) -> Atoms:
+    """Build a Si supercell oriented along [110] zone axis.
+
+    For [110] viewing:
+    - x along [-1,1,0]
+    - y along [0,0,1]
+    - z along [1,1,0] (beam direction)
+    """
+    import abtem
+
+    si = bulk("Si", "diamond", a=SI_A)
+
+    # Cut to get [110] orientation: z along [110]
+    # a=[-1,1,0], b=[0,0,1], c=[1,1,0]
+    si_110 = cut(si, a=(-1, 1, 0), b=(0, 0, 1), c=(1, 1, 0))
+
+    # Build supercell
+    supercell = build_supercell(
+        si_110,
+        target_size_angstrom=(fov_angstrom, fov_angstrom, z_thickness),
+    )
+    return supercell
+
+
+def apply_ge_gradient(
+    atoms: Atoms,
+    interface_position: float,
+    gradient_width_frac: float,
+    ge_max_fraction: float,
+    rng: np.random.Generator,
+) -> tuple[Atoms, np.ndarray, np.ndarray]:
+    """Replace Si atoms with Ge according to a composition gradient.
+
+    The Ge fraction increases from 0 to ge_max_fraction as x increases
+    past the interface position, with a smooth sigmoid transition.
+
+    Args:
+        atoms: Si supercell.
+        interface_position: Position of interface as fraction of cell x [0, 1].
+        gradient_width_frac: Width of gradient as fraction of cell x.
+        ge_max_fraction: Maximum Ge fraction at the far edge.
+        rng: Random number generator.
+
+    Returns:
+        (modified_atoms, substitution_indices, ge_fraction_profile)
+    """
+    modified = atoms.copy()
+    positions = modified.get_positions()
+    symbols = list(modified.get_chemical_symbols())
+    cell_x = modified.cell[0, 0]
+
+    # Interface position in Angstrom
+    x_interface = interface_position * cell_x
+    gradient_width = gradient_width_frac * cell_x
+
+    # Compute Ge fraction at each atom position based on x
+    substitution_indices = []
+    n_si = sum(1 for s in symbols if s == "Si")
+
+    for i, (pos, sym) in enumerate(zip(positions, symbols)):
+        if sym != "Si":
+            continue
+
+        # Sigmoid-like Ge fraction
+        x = pos[0]
+        # Distance past interface, normalized by gradient width
+        if gradient_width > 0:
+            t = (x - x_interface) / gradient_width
+        else:
+            t = np.inf if x > x_interface else -np.inf
+
+        # Sigmoid: 0 for t << 0, ge_max for t >> 0
+        ge_frac = ge_max_fraction / (1.0 + np.exp(-4.0 * t))
+
+        # Stochastic substitution
+        if rng.random() < ge_frac:
+            symbols[i] = "Ge"
+            substitution_indices.append(i)
+            # Adjust position slightly for Ge lattice mismatch
+            # Ge is ~4% larger than Si
+            expansion = (GE_A - SI_A) / SI_A * ge_frac
+            positions[i] *= (1.0 + expansion * 0.5)
+
+    modified.set_chemical_symbols(symbols)
+    modified.set_positions(positions)
+
+    # Compute Ge fraction profile (1D along x)
+    n_bins = 100
+    bin_edges = np.linspace(0, cell_x, n_bins + 1)
+    ge_profile = np.zeros(n_bins)
+    total_profile = np.zeros(n_bins)
+    for i, (pos, sym) in enumerate(zip(positions, symbols)):
+        bin_idx = min(int(pos[0] / cell_x * n_bins), n_bins - 1)
+        total_profile[bin_idx] += 1
+        if sym == "Ge":
+            ge_profile[bin_idx] += 1
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ge_fraction = np.where(total_profile > 0, ge_profile / total_profile, 0.0)
+
+    return modified, np.array(substitution_indices), ge_fraction.astype(np.float32)
+
+
+def make_interface_phase_map(
+    shape_px: tuple[int, int],
+    interface_position: float,
+    gradient_width_frac: float,
+) -> np.ndarray:
+    """Create a phase map for the Si/Ge interface.
+
+    0 = pure Si, 1 = interface/gradient region, 2 = Ge-rich
+    """
+    h, w = shape_px
+    phase_map = np.zeros(shape_px, dtype=np.int32)
+
+    x_interface = int(interface_position * w)
+    gradient_half = int(gradient_width_frac * w / 2)
+
+    # Interface region
+    x_start = max(0, x_interface - gradient_half)
+    x_end = min(w, x_interface + gradient_half)
+
+    phase_map[:, x_start:x_end] = 1
+    phase_map[:, x_end:] = 2
+
+    return phase_map
 
 # Quadrant center in fractional coordinates
 QUADRANT_CENTER = np.array([0.75, 0.75])

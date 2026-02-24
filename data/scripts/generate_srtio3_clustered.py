@@ -25,6 +25,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from ase import Atoms
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -34,16 +35,59 @@ sys.path.insert(0, str(Path(__file__).parent))
 from sim_utils import (
     SimConfig,
     build_supercell,
+    fetch_mp_structure,
     plant_vacancies_weighted,
     record_ground_truth,
     run_stem_simulation,
     write_world_hdf5,
     DIFFICULTY_PARAMS,
 )
-from generate_srtio3 import (
-    build_srtio3_from_mp,
-    STO_PHONON_SIGMAS,
-)
+
+# SrTiO3 lattice parameter
+STO_A = 3.905  # Angstrom, cubic perovskite
+
+# Debye-Waller factors (RMS displacement in Angstrom) for SrTiO3
+# From: Abramov et al., Acta Cryst. B 51, 942-951, 1995 (values at 296 K)
+STO_PHONON_SIGMAS = {
+    "Sr": 0.084,
+    "Ti": 0.060,
+    "O": 0.085,
+}
+
+
+def build_srtio3_unit_cell() -> Atoms:
+    """Build SrTiO3 cubic perovskite unit cell.
+
+    Layout (cubic, a=3.905 Å):
+        Sr at corners: (0, 0, 0)
+        Ti at body center: (0.5, 0.5, 0.5)
+        O at face centers: (0.5, 0.5, 0), (0.5, 0, 0.5), (0, 0.5, 0.5)
+    """
+    a = STO_A
+    atoms = Atoms(
+        symbols=["Sr", "Ti", "O", "O", "O"],
+        positions=[
+            [0.0, 0.0, 0.0],           # Sr
+            [a/2, a/2, a/2],            # Ti
+            [a/2, a/2, 0.0],            # O (xy face)
+            [a/2, 0.0, a/2],            # O (xz face)
+            [0.0, a/2, a/2],            # O (yz face)
+        ],
+        cell=[a, a, a],
+        pbc=True,
+    )
+    return atoms
+
+
+def build_srtio3_from_mp(api_key: str | None = None) -> Atoms:
+    """Fetch SrTiO3 from Materials Project (mp-5229)."""
+    try:
+        atoms = fetch_mp_structure("mp-5229", api_key=api_key)
+        logger.info(f"Fetched SrTiO3 from MP: {len(atoms)} atoms")
+        return atoms
+    except Exception as e:
+        logger.warning(f"Could not fetch from MP ({e}), using built-in unit cell")
+        return build_srtio3_unit_cell()
 
 # Difficulty params for clustered SrTiO3
 CLUSTERED_DIFFICULTY = {

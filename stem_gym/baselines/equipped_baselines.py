@@ -28,24 +28,21 @@ _DEFAULT_CHECKPOINT_DIR = Path(__file__).resolve().parent.parent.parent / "check
 
 def _assemble_findings(
     analyst: Analyst,
-    tile_phases: dict[tuple[int, int], int],
     grid_shape: tuple[int, int],
 ) -> dict[str, Any]:
-    """Build findings dict from analyst state and tile phase labels.
+    """Build findings dict from analyst state and corrected phase labels.
 
     Shared by both equipped agents — same logic as STEMAgent.get_findings().
     """
-    # Phase map — only return if agent observed >=2 distinct phases
-    # (mirrors STEMAgent.get_findings(); avoids false-positive on single-phase worlds)
+    # Phase map from corrected tile phases (Cohen's d significance test)
     phase_map = None
-    if tile_phases:
-        distinct_phases = set(tile_phases.values())
-        if len(distinct_phases) >= 2:
-            gh, gw = grid_shape
-            phase_map = np.zeros((gh, gw), dtype=np.int32)
-            for (r, c), phase in tile_phases.items():
-                if 0 <= r < gh and 0 <= c < gw:
-                    phase_map[r, c] = phase
+    corrected = analyst.get_corrected_tile_phases()
+    if corrected is not None:
+        gh, gw = grid_shape
+        phase_map = np.zeros((gh, gw), dtype=np.int32)
+        for (r, c), phase in corrected.items():
+            if 0 <= r < gh and 0 <= c < gw:
+                phase_map[r, c] = phase
 
     # Defect positions from analyst accumulated state
     defect_positions = []
@@ -111,12 +108,10 @@ class GPUCBEquippedAgent(GPUCBAgent):
         super().__init__(beta=beta, seed=seed, initial_random=initial_random)
         self.analyst = _load_analyst(checkpoint_dir)
         self._pixel_size_nm: float = 0.005
-        self._tile_phases: dict[tuple[int, int], int] = {}
 
     def reset(self, obs, info):
         super().reset(obs, info)
         self._pixel_size_nm = info.get("pixel_size_nm", 0.005)
-        self._tile_phases.clear()
         self.rng = np.random.default_rng(self.seed)
 
     def act(self, obs, info):
@@ -143,12 +138,12 @@ class GPUCBEquippedAgent(GPUCBAgent):
                 pos = obs["position"]
                 x_nm, y_nm = float(pos[0]), float(pos[1])
 
+                row, col = self._nm_to_grid(x_nm, y_nm)
                 result = self.analyst.analyze_tile(
                     tile, tile_position_nm=(x_nm, y_nm),
                     pixel_size_nm=self._pixel_size_nm,
+                    tile_key=(row, col),
                 )
-                row, col = self._nm_to_grid(x_nm, y_nm)
-                self._tile_phases[(row, col)] = result.phase_label
 
                 interestingness = self._tile_interestingness(tile)
                 self._visited_set.add((row, col))
@@ -170,7 +165,7 @@ class GPUCBEquippedAgent(GPUCBAgent):
             }
 
     def get_findings(self):
-        return _assemble_findings(self.analyst, self._tile_phases, self._grid_shape)
+        return _assemble_findings(self.analyst, self._grid_shape)
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +192,6 @@ class RasterEquippedAgent(Agent):
         self._tile_queue: list[tuple[int, int]] = []
         self._navigate_phase = True
         self._current_target: tuple[float, float] = (0.0, 0.0)
-        self._tile_phases: dict[tuple[int, int], int] = {}
 
     def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
         self.analyst.reset()
@@ -205,7 +199,6 @@ class RasterEquippedAgent(Agent):
         self._fov_nm = info.get("fov_nm", (100.0, 100.0))
         self._pixel_size_nm = info.get("pixel_size_nm", 0.005)
         self._navigate_phase = True
-        self._tile_phases.clear()
 
         # Build row-major tile queue
         rows, cols = self._grid_shape
@@ -253,15 +246,13 @@ class RasterEquippedAgent(Agent):
                 x_nm, y_nm = self._current_target
 
                 # Analyze with trained analyst (with position for world coords)
-                result = self.analyst.analyze_tile(
+                row, col = self._nm_to_grid(x_nm, y_nm)
+                self.analyst.analyze_tile(
                     tile,
                     tile_position_nm=(x_nm, y_nm),
                     pixel_size_nm=self._pixel_size_nm,
+                    tile_key=(row, col),
                 )
-
-                # Record phase label for phase map
-                row, col = self._nm_to_grid(x_nm, y_nm)
-                self._tile_phases[(row, col)] = result.phase_label
 
             return {
                 "action_type": ActionType.ACQUIRE,
@@ -272,4 +263,4 @@ class RasterEquippedAgent(Agent):
             }
 
     def get_findings(self) -> dict[str, Any]:
-        return _assemble_findings(self.analyst, self._tile_phases, self._grid_shape)
+        return _assemble_findings(self.analyst, self._grid_shape)

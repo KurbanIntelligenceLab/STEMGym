@@ -72,9 +72,6 @@ class STEMAgent(Agent):
         self._target_pos: tuple[float, float] = (0.0, 0.0)
         self._skip_acquire: bool = False
 
-        # Track phase labels per tile for phase map reconstruction
-        self._tile_phases: dict[tuple[int, int], int] = {}
-
     @staticmethod
     def _try_load_analyst(checkpoint_dir: str | Path | None) -> Analyst | None:
         """Try to load trained analyst from checkpoints."""
@@ -119,7 +116,6 @@ class STEMAgent(Agent):
 
         self._phase = "navigate"
         self._skip_acquire = False
-        self._tile_phases.clear()
 
     def act(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> dict[str, Any]:
         """Select an action: navigate → acquire/skip → repeat."""
@@ -184,20 +180,22 @@ class STEMAgent(Agent):
                 # Run analyst on previously acquired tile (from last step's obs)
                 pos = obs["position"]
                 x_nm, y_nm = float(pos[0]), float(pos[1])
-                result = self.analyst.analyze_tile(
-                    tile,
-                    tile_position_nm=(x_nm, y_nm),
-                    pixel_size_nm=s.pixel_size_nm,
-                )
-
-                # Record phase label for this tile position
+                # Compute tile grid key for phase tracking
+                tile_key = None
                 if s.fov_nm[0] > 0 and s.fov_nm[1] > 0:
                     gh, gw = s.visited_mask.shape
                     tile_r = int(y_nm / s.fov_nm[0] * gh)
                     tile_c = int(x_nm / s.fov_nm[1] * gw)
                     tile_r = min(tile_r, gh - 1)
                     tile_c = min(tile_c, gw - 1)
-                    self._tile_phases[(tile_r, tile_c)] = result.phase_label
+                    tile_key = (tile_r, tile_c)
+
+                result = self.analyst.analyze_tile(
+                    tile,
+                    tile_position_nm=(x_nm, y_nm),
+                    pixel_size_nm=s.pixel_size_nm,
+                    tile_key=tile_key,
+                )
 
                 # Update navigator with new observation
                 self.navigator.record_observation(s, tile, x_nm, y_nm)
@@ -247,16 +245,15 @@ class STEMAgent(Agent):
 
     def get_findings(self) -> dict[str, Any]:
         """Return accumulated findings for task scoring."""
-        # Build phase map from tile-level phase labels
+        # Build phase map from corrected tile-level phase labels
         phase_map = None
-        if self._state is not None and self._tile_phases:
-            distinct_phases = set(self._tile_phases.values())
-            if len(distinct_phases) >= 2:
-                gh, gw = self._state.visited_mask.shape
-                phase_map = np.zeros((gh, gw), dtype=np.int32)
-                for (r, c), phase in self._tile_phases.items():
-                    if 0 <= r < gh and 0 <= c < gw:
-                        phase_map[r, c] = phase
+        corrected = self.analyst.get_corrected_tile_phases()
+        if corrected is not None and self._state is not None:
+            gh, gw = self._state.visited_mask.shape
+            phase_map = np.zeros((gh, gw), dtype=np.int32)
+            for (r, c), phase in corrected.items():
+                if 0 <= r < gh and 0 <= c < gw:
+                    phase_map[r, c] = phase
 
         # Collect defect positions from analyst — iterate positions and labels
         # in lockstep across all tiles

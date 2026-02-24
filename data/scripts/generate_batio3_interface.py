@@ -26,6 +26,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+from ase import Atoms
 from scipy.ndimage import distance_transform_edt
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -35,17 +36,185 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from sim_utils import (
     SimConfig,
+    build_supercell,
     plant_vacancies_weighted,
     record_ground_truth,
     run_stem_simulation,
     write_world_hdf5,
     DIFFICULTY_PARAMS,
 )
-from generate_batio3 import (
-    make_phase_boundary_mask,
-    build_composite_structure,
-    BTO_PHONON_SIGMAS,
-)
+
+# BaTiO3 lattice parameters
+# Cubic phase: a = 4.009 Å (above Curie temperature)
+BTO_CUBIC_A = 4.009
+# Tetragonal phase: a = 3.994 Å, c = 4.038 Å (room temperature)
+BTO_TETRA_A = 3.994
+BTO_TETRA_C = 4.038
+
+# Debye-Waller factors for BaTiO3
+BTO_PHONON_SIGMAS = {
+    "Ba": 0.080,
+    "Ti": 0.080,
+    "O": 0.090,
+}
+
+
+def build_batio3_cell(phase: str = "cubic") -> Atoms:
+    """Build BaTiO3 perovskite unit cell.
+
+    Args:
+        phase: "cubic" or "tetragonal".
+
+    Cubic: a = b = c = 4.009 Å
+    Tetragonal: a = b = 3.994 Å, c = 4.038 Å, Ti displaced along c
+    """
+    if phase == "cubic":
+        a = BTO_CUBIC_A
+        atoms = Atoms(
+            symbols=["Ba", "Ti", "O", "O", "O"],
+            positions=[
+                [0.0, 0.0, 0.0],
+                [a/2, a/2, a/2],
+                [a/2, a/2, 0.0],
+                [a/2, 0.0, a/2],
+                [0.0, a/2, a/2],
+            ],
+            cell=[a, a, a],
+            pbc=True,
+        )
+    elif phase == "tetragonal":
+        a, c = BTO_TETRA_A, BTO_TETRA_C
+        # Ti is displaced ~0.05 Å along c in tetragonal phase
+        ti_disp = 0.05
+        atoms = Atoms(
+            symbols=["Ba", "Ti", "O", "O", "O"],
+            positions=[
+                [0.0, 0.0, 0.0],
+                [a/2, a/2, c/2 + ti_disp],
+                [a/2, a/2, 0.0],
+                [a/2, 0.0, c/2],
+                [0.0, a/2, c/2],
+            ],
+            cell=[a, a, c],
+            pbc=True,
+        )
+    else:
+        raise ValueError(f"Unknown phase: {phase}")
+    return atoms
+
+
+def make_phase_boundary_mask(
+    shape_px: tuple[int, int],
+    n_boundaries: int = 1,
+    waviness: float = 0.0,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
+    """Create a phase map with boundaries between cubic (0) and tetragonal (1).
+
+    Args:
+        shape_px: (H, W) image shape in pixels.
+        n_boundaries: Number of phase boundaries.
+        waviness: Amplitude of boundary waviness as fraction of width.
+        rng: Random number generator.
+
+    Returns:
+        (H, W) int32 array: 0 = cubic, 1 = tetragonal.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    h, w = shape_px
+    phase_map = np.zeros(shape_px, dtype=np.int32)
+
+    # Evenly space boundaries
+    boundary_positions = np.linspace(0, w, n_boundaries + 2)[1:-1]
+
+    for i, bx in enumerate(boundary_positions):
+        # Create wavy boundary
+        if waviness > 0:
+            # Sinusoidal + random perturbation
+            freq = rng.uniform(1, 4)
+            phase_offset = rng.uniform(0, 2 * np.pi)
+            wave = waviness * w * np.sin(
+                2 * np.pi * freq * np.arange(h) / h + phase_offset
+            )
+            # Add some random roughness
+            roughness = waviness * w * 0.3 * rng.normal(size=h)
+            from scipy.ndimage import gaussian_filter1d
+            roughness = gaussian_filter1d(roughness, sigma=h * 0.05)
+            boundary = bx + wave + roughness
+        else:
+            boundary = np.full(h, bx)
+
+        for row in range(h):
+            col_boundary = int(np.clip(boundary[row], 0, w - 1))
+            # Alternate phases at each boundary
+            if i % 2 == 0:
+                phase_map[row, col_boundary:] = 1
+            else:
+                phase_map[row, col_boundary:] = 0
+
+    return phase_map
+
+
+def build_composite_structure(
+    fov_angstrom: float,
+    z_thickness: float,
+    phase_map: np.ndarray,
+    sampling_angstrom: float = 0.5,
+) -> tuple[Atoms, np.ndarray]:
+    """Build a composite cubic+tetragonal BaTiO3 structure.
+
+    Places cubic or tetragonal unit cells based on the phase map.
+    Returns the full atomic structure and per-atom phase labels.
+
+    For efficiency, we build separate supercells for each phase region
+    and merge them.
+    """
+    import abtem
+
+    # Build supercells for both phases
+    cubic_cell = build_batio3_cell("cubic")
+    tetra_cell = build_batio3_cell("tetragonal")
+
+    # Build full cubic supercell as base
+    cubic_super = build_supercell(
+        cubic_cell,
+        target_size_angstrom=(fov_angstrom, fov_angstrom, z_thickness),
+    )
+    tetra_super = build_supercell(
+        tetra_cell,
+        target_size_angstrom=(fov_angstrom, fov_angstrom, z_thickness),
+    )
+
+    # For a first-order approximation: use cubic everywhere but modify
+    # atom positions in tetragonal regions to match tetragonal cell.
+    # This gives physically correct column positions.
+    composite = cubic_super.copy()
+    cell_x = composite.cell[0, 0]
+    cell_y = composite.cell[1, 1]
+    map_h, map_w = phase_map.shape
+
+    positions = composite.get_positions()
+    atom_phases = np.zeros(len(composite), dtype=np.int32)
+
+    for i, pos in enumerate(positions):
+        # Map atom position to phase map pixel
+        px = int(pos[0] / cell_x * map_w) % map_w
+        py = int(pos[1] / cell_y * map_h) % map_h
+
+        if phase_map[py, px] == 1:
+            atom_phases[i] = 1
+            # Apply tetragonal distortion: slightly compress a,b and stretch c
+            scale_ab = BTO_TETRA_A / BTO_CUBIC_A
+            scale_c = BTO_TETRA_C / BTO_CUBIC_A
+            positions[i, 0] *= scale_ab
+            positions[i, 1] *= scale_ab
+            positions[i, 2] *= scale_c
+
+    composite.set_positions(positions)
+
+    return composite, atom_phases
 
 # Difficulty params for BaTiO3 interface scenario
 INTERFACE_DIFFICULTY = {

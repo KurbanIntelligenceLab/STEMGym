@@ -35,6 +35,12 @@ WORLD_FILES = [
     "sige_gradient_clustered_easy.h5",
     "sige_gradient_clustered_medium.h5",
     "sige_gradient_clustered_hard.h5",
+    "gan_easy.h5",
+    "gan_medium.h5",
+    "gan_hard.h5",
+    "pt_nanoparticles_easy.h5",
+    "pt_nanoparticles_medium.h5",
+    "pt_nanoparticles_hard.h5",
 ]
 
 CHECKPOINT_FILES = [

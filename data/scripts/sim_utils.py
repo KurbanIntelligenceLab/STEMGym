@@ -1,6 +1,6 @@
 """Shared abTEM simulation pipeline utilities for scenario generators.
 
-All three scenario generators (SrTiO3, BaTiO3, Si/Ge) share this pipeline:
+All scenario generators (SrTiO3, BaTiO3, Si/Ge, GaN, Pt) share this pipeline:
   MP structure → ASE → supercell → plant defects → record ground truth
   → frozen phonons → PRISM → Poisson noise → tile → HDF5
 """

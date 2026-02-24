@@ -1,0 +1,594 @@
+#!/usr/bin/env python3
+"""Generate Pt nanoparticle scenario: Particle Census task.
+
+Material: Pt FCC nanoparticles (mp-126) on amorphous carbon support
+Defects: N/A — the nanoparticles themselves are the objects of interest
+Task: Particle Census (detection F1 + size distribution + morphology)
+
+This is the only STEMGym scenario with an aperiodic structure.  Instead
+of analysing a periodic crystal tile-by-tile, the agent must detect
+discrete bright objects (Pt nanoparticles, Z=78) against a disordered
+amorphous-carbon background (Z=6).  This tests fundamentally different
+skills: object detection, size measurement, and morphology classification
+rather than column-by-column lattice analysis.
+
+Particle types
+--------------
+- Single crystal   (Wulff construction, truncated octahedron)
+- Icosahedral      (Mackay icosahedra, multiply twinned)
+- Decahedral       (Marks decahedra, multiply twinned)
+
+Each particle is placed at a random position with a random 3-D
+orientation on a flat amorphous-carbon support film.
+
+References
+----------
+Pt crystal structure:
+    Materials Project mp-126  (Fm-3m, #225, a = 3.9242 Å)
+    https://next-gen.materialsproject.org/materials/mp-126
+
+Pt surface energies (Wulff construction):
+    Vitos, L. et al.
+    "The surface energy of metals"
+    Surf. Sci. 411, 186–202, 1998.
+    γ(111) = 1.49,  γ(100) = 1.81,  γ(110) = 1.72  J/m²  (GGA-PBE)
+
+Debye–Waller / frozen phonon:
+    Peng, L.-M. et al.
+    "Debye–Waller factors and absorptive scattering factors of
+     elemental crystals"
+    Acta Cryst. A52, 456–470, 1996.
+    σ_Pt = 0.070 Å (B_iso = 0.39 Å²) at 300 K.   Θ_D(Pt) = 234 K.
+
+Amorphous carbon:
+    Typical TEM support film: density ~2.0 g/cm³, thickness 3–10 nm.
+    σ_C ≈ 0.080 Å (includes thermal + static disorder).
+
+Pt nanoparticle STEM simulation precedent:
+    Eliasson, H. et al.
+    "CycleGAN for Sim-to-Real HAADF-STEM of Pt/CeO₂ catalysts"
+    Small Methods, 2025.
+
+    De Backer, A. et al.
+    "Atom counting in HAADF-STEM using a statistical model-based
+     approach: methodology, possibilities, and inherent limitations"
+    Ultramicroscopy 134, 23–33, 2013.
+
+    Sang, X. & LeBeau, J.M.
+    "Revolving scanning transmission electron microscopy"
+    Ultramicroscopy 201, 37–43, 2019.
+
+Scoring:
+    Detection — Spatial F1 (Hungarian matching, r_match = 1 nm).
+    Sizing   — exp(−W₁ / ⟨d_true⟩)  via scipy.stats.wasserstein_distance.
+    Morphology — Macro-averaged F1 over {single_crystal, ico, deca}.
+    Overall  = 0.5 × F1_det + 0.3 × S_size + 0.2 × F1_morph.
+
+Electron optics (shared benchmark parameters):
+    200 keV, 21 mrad convergence, HAADF 68–200 mrad
+    0.05 Å potential sampling, 1.0 Å slice thickness, PRISM
+
+Usage:
+    python data/scripts/generate_pt_nanoparticles.py \
+        [--difficulty easy|medium|hard] \
+        [--output data/simulated/pt_nanoparticles.h5] \
+        [--device cpu|gpu] [--seed 42]
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from pathlib import Path
+
+import numpy as np
+from ase import Atoms
+from scipy.spatial.transform import Rotation
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+from sim_utils import (
+    SimConfig,
+    GroundTruth,
+    run_stem_simulation,
+    write_world_hdf5,
+    DIFFICULTY_PARAMS,
+)
+
+# ---------------------------------------------------------------------------
+# Pt crystallographic constants
+# ---------------------------------------------------------------------------
+
+# FCC lattice parameter (mp-126)
+PT_A = 3.9242  # Å
+# d-spacings: {111} = 2.265 Å, {200} = 1.962 Å, {220} = 1.388 Å
+
+# Pt surface energies for Wulff construction (Vitos et al. 1998, GGA-PBE)
+PT_SURFACES = [(1, 0, 0), (1, 1, 0), (1, 1, 1)]
+PT_ENERGIES = [1.81, 1.72, 1.49]  # J/m²
+
+# Debye–Waller: isotropic RMS displacement at 300 K
+# Peng et al., Acta Cryst. A52, 456-470, 1996
+PT_PHONON_SIGMAS = {
+    "Pt": 0.070,  # Θ_D = 234 K → large thermal vibration at 300 K
+    "C":  0.080,  # amorphous C: thermal + static disorder
+}
+
+# Morphology labels
+MORPH_SINGLE_CRYSTAL = 0
+MORPH_ICOSAHEDRAL    = 1
+MORPH_DECAHEDRAL     = 2
+MORPH_NAMES = {0: "single_crystal", 1: "icosahedral", 2: "decahedral"}
+
+# ---------------------------------------------------------------------------
+# Difficulty parameters
+# ---------------------------------------------------------------------------
+
+PT_DIFFICULTY = {
+    "easy": {
+        "n_particles":       8,
+        "diameter_mean_nm":  4.0,
+        "diameter_sigma_nm": 0.8,
+        "diameter_min_nm":   2.5,
+        "morph_weights":     [0.80, 0.10, 0.10],  # wulff / ico / deca
+        "min_sep_nm":        10.0,
+        "support_thick_nm":  3.0,
+    },
+    "medium": {
+        "n_particles":       20,
+        "diameter_mean_nm":  3.0,
+        "diameter_sigma_nm": 1.0,
+        "diameter_min_nm":   1.5,
+        "morph_weights":     [0.50, 0.25, 0.25],
+        "min_sep_nm":        5.0,
+        "support_thick_nm":  5.0,
+    },
+    "hard": {
+        "n_particles":       40,
+        "diameter_mean_nm":  1.8,
+        "diameter_sigma_nm": 0.8,
+        "diameter_min_nm":   0.8,
+        "morph_weights":     [0.30, 0.30, 0.40],
+        "min_sep_nm":        2.0,
+        "support_thick_nm":  8.0,
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Nanoparticle builders
+# ---------------------------------------------------------------------------
+
+def _natoms_from_diameter(d_nm: float) -> int:
+    """Approximate atom count for an FCC sphere of given diameter."""
+    d_ang = d_nm * 10.0
+    v_sphere = (4.0 / 3.0) * np.pi * (d_ang / 2.0) ** 3
+    v_atom = PT_A ** 3 / 4.0  # 4 atoms per FCC unit cell
+    return max(13, int(round(v_sphere / v_atom)))
+
+
+def _measure_diameter(particle: Atoms) -> float:
+    """Bounding-sphere diameter of a particle, in nm."""
+    pos = particle.get_positions()
+    radii = np.linalg.norm(pos - pos.mean(axis=0), axis=1)
+    return (2.0 * radii.max() + 2.8) / 10.0  # +2.8 Å ≈ Pt VdW
+
+
+def make_wulff_particle(n_target: int) -> Atoms:
+    """Single-crystal Pt via Wulff construction (truncated octahedron)."""
+    from ase.cluster import wulff_construction
+    p = wulff_construction(
+        "Pt", PT_SURFACES, PT_ENERGIES,
+        size=n_target, structure="fcc",
+        rounding="closest", latticeconstant=PT_A,
+    )
+    p.positions -= p.positions.mean(axis=0)
+    return p
+
+
+def make_icosahedral_particle(n_target: int) -> Atoms:
+    """Multiply-twinned Mackay icosahedron.
+
+    Magic numbers: 13, 55, 147, 309, 561, 923, 1415, …
+    """
+    from ase.cluster import Icosahedron
+    best, best_diff = 2, float("inf")
+    for k in range(2, 12):
+        n = (10 * k**3 + 15 * k**2 + 11 * k + 3) // 3
+        if abs(n - n_target) < best_diff:
+            best, best_diff = k, abs(n - n_target)
+        if n > 2 * n_target:
+            break
+    p = Icosahedron("Pt", noshells=best, latticeconstant=PT_A)
+    p.positions -= p.positions.mean(axis=0)
+    return p
+
+
+def make_decahedral_particle(n_target: int) -> Atoms:
+    """Multiply-twinned Marks decahedron."""
+    from ase.cluster import Decahedron
+    best_p, best_diff = 2, float("inf")
+    for pp in range(2, 10):
+        qq = max(1, pp // 2)
+        try:
+            test = Decahedron("Pt", p=pp, q=qq, r=0, latticeconstant=PT_A)
+            if abs(len(test) - n_target) < best_diff:
+                best_p, best_diff = pp, abs(len(test) - n_target)
+            if len(test) > 2 * n_target:
+                break
+        except Exception:
+            continue
+    qq = max(1, best_p // 2)
+    p = Decahedron("Pt", p=best_p, q=qq, r=0, latticeconstant=PT_A)
+    p.positions -= p.positions.mean(axis=0)
+    return p
+
+
+_BUILDERS = [make_wulff_particle, make_icosahedral_particle, make_decahedral_particle]
+_LABELS   = [MORPH_SINGLE_CRYSTAL, MORPH_ICOSAHEDRAL, MORPH_DECAHEDRAL]
+
+
+# ---------------------------------------------------------------------------
+# Amorphous carbon support
+# ---------------------------------------------------------------------------
+
+def make_amorphous_carbon(
+    lx: float, ly: float, thickness: float,
+    density_gcc: float = 2.0,
+    rng: np.random.Generator | None = None,
+) -> Atoms:
+    """Generate an amorphous carbon slab by random placement.
+
+    A simple hard-sphere model with grid-based jitter for efficiency.
+    For more physically accurate a-C, use melt-quench MD with the
+    Tersoff or GAP-20 potential (Deringer et al., PRB 95, 2017).
+
+    Uses a face-centred-cubic grid at the target density with ~1 Å
+    Gaussian jitter per atom — vectorised, O(N), handles millions of
+    atoms comfortably.
+    """
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    # atoms / ų
+    n_density = density_gcc * 6.022e23 / 12.011 * 1e-24
+    volume = lx * ly * thickness
+    n_atoms = int(n_density * volume)
+
+    logger.info(
+        f"Generating amorphous carbon: {lx:.0f}×{ly:.0f}×{thickness:.0f} Å, "
+        f"ρ={density_gcc} g/cm³, {n_atoms} atoms"
+    )
+
+    # Grid spacing for target density (cubic grid, 1 atom per cell)
+    grid_a = (1.0 / n_density) ** (1.0 / 3.0)  # ~2.15 Å
+
+    nx = max(1, int(np.ceil(lx / grid_a)))
+    ny = max(1, int(np.ceil(ly / grid_a)))
+    nz = max(1, int(np.ceil(thickness / grid_a)))
+
+    # Build grid centres
+    gx = np.linspace(grid_a / 2, lx - grid_a / 2, nx)
+    gy = np.linspace(grid_a / 2, ly - grid_a / 2, ny)
+    gz = np.linspace(grid_a / 2, thickness - grid_a / 2, nz)
+    xx, yy, zz = np.meshgrid(gx, gy, gz, indexing="ij")
+    positions = np.column_stack([xx.ravel(), yy.ravel(), zz.ravel()])
+
+    # Gaussian jitter (~1 Å sigma) to destroy any lattice periodicity
+    jitter_sigma = grid_a * 0.40
+    positions += rng.normal(scale=jitter_sigma, size=positions.shape)
+
+    # Clip into cell
+    positions[:, 0] = np.clip(positions[:, 0], 0.2, lx - 0.2)
+    positions[:, 1] = np.clip(positions[:, 1], 0.2, ly - 0.2)
+    positions[:, 2] = np.clip(positions[:, 2], 0.2, thickness - 0.2)
+
+    # Randomly thin to exact target count if grid overproduced
+    if len(positions) > n_atoms:
+        idx = rng.choice(len(positions), size=n_atoms, replace=False)
+        positions = positions[idx]
+
+    n_placed = len(positions)
+    logger.info(f"Placed {n_placed} C atoms")
+
+    # Cell with vacuum above the support (room for NPs)
+    vacuum_above = 100.0  # Å
+    atoms = Atoms(
+        "C" * n_placed,
+        positions=positions,
+        cell=[lx, ly, thickness + vacuum_above],
+        pbc=[True, True, False],
+    )
+    return atoms
+
+
+# ---------------------------------------------------------------------------
+# World assembly
+# ---------------------------------------------------------------------------
+
+def place_particles_on_support(
+    support: Atoms,
+    pdiff: dict,
+    fov_angstrom: float,
+    rng: np.random.Generator,
+) -> tuple[Atoms, list[dict]]:
+    """Place Pt nanoparticles on the carbon support.
+
+    Poisson-disk-like sampling with size-aware minimum separation and
+    random 3-D orientation for each particle.
+
+    Returns
+    -------
+    combined : Atoms
+        Merged support + all particles.
+    meta : list[dict]
+        Per-particle metadata (centroid, diameter, morphology, n_atoms).
+    """
+    n_particles   = pdiff["n_particles"]
+    d_mean        = pdiff["diameter_mean_nm"]
+    d_sigma       = pdiff["diameter_sigma_nm"]
+    d_min         = pdiff["diameter_min_nm"]
+    morph_w       = pdiff["morph_weights"]
+    min_sep_ang   = pdiff["min_sep_nm"] * 10.0
+    support_thick = pdiff["support_thick_nm"] * 10.0
+
+    margin = 30.0  # Å from cell edges
+
+    combined = support.copy()
+    meta: list[dict] = []
+    placed_xy: list[list[float]] = []
+
+    for p_idx in range(n_particles):
+        # --- sample diameter (truncated log-normal) ---
+        for _ in range(200):
+            d_nm = rng.lognormal(mean=np.log(d_mean), sigma=d_sigma / d_mean)
+            if d_nm >= d_min:
+                break
+        d_nm = max(d_min, d_nm)
+
+        # --- choose morphology ---
+        morph_idx = rng.choice(3, p=morph_w)
+        builder   = _BUILDERS[morph_idx]
+        label     = _LABELS[morph_idx]
+
+        # --- build particle ---
+        n_target = _natoms_from_diameter(d_nm)
+        try:
+            particle = builder(n_target)
+        except Exception as exc:
+            logger.warning(
+                f"Could not build {MORPH_NAMES[label]} "
+                f"(~{n_target} atoms): {exc}. Wulff fallback."
+            )
+            particle = make_wulff_particle(n_target)
+            label = MORPH_SINGLE_CRYSTAL
+
+        actual_d = _measure_diameter(particle)
+
+        # --- random 3-D rotation ---
+        rot = Rotation.random(random_state=rng.integers(2**31))
+        particle.positions = rot.apply(particle.positions)
+        particle.positions -= particle.positions.mean(axis=0)
+
+        # --- placement (Poisson-disk) ---
+        placed = False
+        for _ in range(500):
+            cx = rng.uniform(margin, fov_angstrom - margin)
+            cy = rng.uniform(margin, fov_angstrom - margin)
+            if placed_xy:
+                dists = np.hypot(
+                    np.array(placed_xy)[:, 0] - cx,
+                    np.array(placed_xy)[:, 1] - cy,
+                )
+                if dists.min() < min_sep_ang:
+                    continue
+            placed = True
+            break
+
+        if not placed:
+            logger.warning(
+                f"Could not place particle {p_idx+1}/{n_particles} "
+                f"(d={d_nm:.1f} nm) — skipping."
+            )
+            continue
+
+        # Sit on top of support (1 Å gap)
+        half_h = (particle.positions[:, 2].max() -
+                  particle.positions[:, 2].min()) / 2.0
+        cz = support_thick + half_h + 1.0
+
+        particle.positions[:, 0] += cx
+        particle.positions[:, 1] += cy
+        particle.positions[:, 2] += cz
+        particle.set_cell(combined.cell)
+        particle.set_pbc(combined.pbc)
+
+        combined = combined + particle
+        placed_xy.append([cx, cy])
+
+        meta.append({
+            "centroid_nm": (cx / 10.0, cy / 10.0),
+            "diameter_nm": actual_d,
+            "morphology_label": label,
+            "morphology_name": MORPH_NAMES[label],
+            "n_atoms": len(particle),
+        })
+
+        logger.info(
+            f"  Particle {p_idx+1}/{n_particles}: "
+            f"{MORPH_NAMES[label]}, d={actual_d:.1f} nm, "
+            f"{len(particle)} atoms at ({cx/10:.1f}, {cy/10:.1f}) nm"
+        )
+
+    return combined, meta
+
+
+def build_particle_ground_truth(meta: list[dict]) -> GroundTruth:
+    """Package particle metadata into GroundTruth.
+
+    "Atoms" are particle centroids; "defect_type" encodes morphology.
+    Extra arrays carry diameter & morphology for the sizing / classification
+    sub-tasks.
+    """
+    n = len(meta)
+
+    centroids = np.array(
+        [m["centroid_nm"] for m in meta], dtype=np.float32,
+    ).reshape(-1, 2)
+    if n == 0:
+        centroids = np.zeros((0, 2), dtype=np.float32)
+
+    gt = GroundTruth(
+        atom_positions_nm=centroids,
+        atom_types=np.full(n, 2, dtype=np.int32),       # 2 = substitution
+        atom_species=["Pt"] * n,
+        defect_mask=np.ones(n, dtype=bool),
+        defect_types=[m["morphology_name"] for m in meta],
+    )
+    gt.extra["material"]                   = "Pt_on_aC"
+    gt.extra["task_type"]                  = "particle_census"
+    gt.extra["n_particles"]                = n
+    gt.extra["particle_diameters_nm"]      = np.array(
+        [m["diameter_nm"] for m in meta], dtype=np.float32,
+    )
+    gt.extra["particle_morphology_labels"] = np.array(
+        [m["morphology_label"] for m in meta], dtype=np.int32,
+    )
+    gt.extra["particle_n_atoms"]           = np.array(
+        [m["n_atoms"] for m in meta], dtype=np.int32,
+    )
+    gt.extra["morphology_names"]           = str(MORPH_NAMES)
+    return gt
+
+
+# ---------------------------------------------------------------------------
+# Main generator
+# ---------------------------------------------------------------------------
+
+def generate_pt_nanoparticles(
+    difficulty: str = "medium",
+    output_path: Path | None = None,
+    device: str = "cpu",
+    seed: int = 42,
+    fov_nm: float = 100.0,
+) -> Path:
+    """Generate Pt nanoparticle world on amorphous carbon support.
+
+    Args:
+        difficulty: "easy", "medium", or "hard".
+        output_path: HDF5 output path.
+        device: "cpu" or "gpu" for abTEM.
+        seed: Random seed.
+        fov_nm: Field of view in nm (default 100).
+
+    Returns:
+        Path to generated HDF5 file.
+    """
+    if output_path is None:
+        output_path = Path(f"data/simulated/pt_nanoparticles_{difficulty}.h5")
+
+    rng  = np.random.default_rng(seed)
+    diff  = DIFFICULTY_PARAMS[difficulty]
+    pdiff = PT_DIFFICULTY[difficulty]
+
+    fov_angstrom = fov_nm * 10.0
+    support_thick_ang = pdiff["support_thick_nm"] * 10.0
+
+    # --- 1. Generate amorphous carbon support ---
+    logger.info("Generating amorphous carbon support...")
+    support = make_amorphous_carbon(
+        lx=fov_angstrom, ly=fov_angstrom,
+        thickness=support_thick_ang,
+        density_gcc=2.0, rng=rng,
+    )
+    logger.info(f"Support: {len(support)} C atoms")
+
+    # --- 2. Build and place nanoparticles ---
+    logger.info(f"Placing {pdiff['n_particles']} Pt nanoparticles...")
+    combined, particle_meta = place_particles_on_support(
+        support, pdiff, fov_angstrom, rng,
+    )
+    n_pt = sum(1 for s in combined.get_chemical_symbols() if s == "Pt")
+    n_c  = sum(1 for s in combined.get_chemical_symbols() if s == "C")
+    logger.info(
+        f"Combined structure: {len(combined)} atoms "
+        f"({n_pt} Pt + {n_c} C), {len(particle_meta)} particles"
+    )
+
+    # --- 3. Record ground truth ---
+    gt = build_particle_ground_truth(particle_meta)
+    gt.extra["support_thick_nm"] = pdiff["support_thick_nm"]
+    gt.extra["difficulty"] = difficulty
+    gt.extra["fov_nm"] = fov_nm
+
+    # --- 4. Configure simulation ---
+    config = SimConfig(
+        scenario="pt_nanoparticles",
+        difficulty=difficulty,
+        energy_eV=200e3,
+        semiangle_cutoff=21.0,
+        haadf_inner=68.0,
+        haadf_outer=200.0,
+        interpolation=2,
+        device=device,
+        sampling=0.05,
+        slice_thickness=1.0,
+        num_phonon_configs=diff["num_phonon_configs"],
+        phonon_sigmas=PT_PHONON_SIGMAS,
+        tile_size_px=128,
+        overlap_px=4,
+        seed=seed,
+    )
+
+    # --- 5. Run STEM simulation ---
+    logger.info("Running STEM-HAADF simulation...")
+    image = run_stem_simulation(combined, config)
+    logger.info(f"Simulation complete: {image.shape}")
+
+    # --- 6. Write HDF5 ---
+    write_world_hdf5(output_path, image, gt, config)
+
+    return output_path
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate Pt nanoparticle scenario for STEMGym",
+    )
+    parser.add_argument(
+        "--difficulty", choices=["easy", "medium", "hard"], default="medium",
+    )
+    parser.add_argument("--output", type=Path, default=None)
+    parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--fov-nm", type=float, default=100.0)
+    parser.add_argument(
+        "--all-difficulties", action="store_true",
+        help="Generate all 3 difficulty levels",
+    )
+    args = parser.parse_args()
+
+    if args.all_difficulties:
+        for diff in ["easy", "medium", "hard"]:
+            out = args.output or Path(f"data/simulated/pt_nanoparticles_{diff}.h5")
+            if args.output and diff != "medium":
+                out = args.output.parent / f"pt_nanoparticles_{diff}.h5"
+            generate_pt_nanoparticles(
+                difficulty=diff, output_path=out,
+                device=args.device, seed=args.seed, fov_nm=args.fov_nm,
+            )
+    else:
+        generate_pt_nanoparticles(
+            difficulty=args.difficulty,
+            output_path=args.output,
+            device=args.device,
+            seed=args.seed,
+            fov_nm=args.fov_nm,
+        )
+
+
+if __name__ == "__main__":
+    main()

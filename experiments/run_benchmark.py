@@ -107,6 +107,10 @@ TASK_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "F1 for locating target features",
         "kwargs": {"target_type": "substitution", "tolerance_nm": 5.0},
     },
+    "particle_census": {
+        "class": "stem_gym.tasks.particle_census.ParticleCensusTask",
+        "description": "Detection + sizing + morphology for nanoparticles",
+    },
 }
 
 # Auto-discover world files

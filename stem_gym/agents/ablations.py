@@ -73,20 +73,18 @@ class STEMAgentNoUncertainty(STEMAgent):
 
     Uses the same trained models but forces the AtomFinder to use only
     one ensemble member, removing predictive uncertainty estimation.
-    Falls back to SimpleAnalyst if no checkpoints found.
+    Falls back to untrained Analyst (heuristic mode) if no checkpoints found.
     """
 
     def __init__(self, seed: int = 42):
-        from stem_gym.agents.simple_analyst import SimpleAnalyst as _SA
-
         # Try to load trained analyst, then disable ensemble uncertainty
         analyst = self._try_load_analyst(None)
         if analyst is not None and analyst.atom_finder is not None:
             # Force single-member prediction (no uncertainty)
             analyst.atom_finder._no_uncertainty = True
         elif analyst is None:
-            # No trained models — use SimpleAnalyst (no uncertainty by design)
-            analyst = _SA()
+            # No trained models — use Analyst for heuristic fallbacks
+            analyst = Analyst()
 
         super().__init__(
             analyst=analyst,

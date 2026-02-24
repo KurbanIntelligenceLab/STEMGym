@@ -5,8 +5,8 @@ Same interface as World, but with modifications for real data:
 - Ground truth derived from automated analysis (may be approximate)
 - Metadata tracks provenance (source dataset, processing params)
 
-Replay worlds are created by data/scripts/prepare_replay.py from
-py4DSTEM 4D-STEM datasets or pre-existing HAADF images.
+Replay worlds are created from py4DSTEM 4D-STEM datasets or
+pre-existing HAADF images.
 """
 
 from __future__ import annotations

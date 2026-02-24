@@ -21,7 +21,7 @@ SIM_WORLD = Path(__file__).parent.parent / "data" / "simulated" / "test_world.h5
 @pytest.fixture(scope="module")
 def replay_path():
     if not REPLAY_WORLD.exists():
-        pytest.skip("Replay world not generated (run prepare_replay.py)")
+        pytest.skip("Replay world not generated")
     return REPLAY_WORLD
 
 
