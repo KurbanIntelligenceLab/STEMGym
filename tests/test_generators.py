@@ -143,7 +143,7 @@ class TestBaTiO3Generator:
 
         config = _mini_sim_config(
             scenario="batio3",
-            phonon_sigmas={"Ba": 0.080, "Ti": 0.055, "O": 0.090},
+            phonon_sigmas={"Ba": 0.080, "Ti": 0.080, "O": 0.090},
         )
         image = run_stem_simulation(composite, config)
         assert image.ndim == 2
@@ -192,7 +192,7 @@ class TestSiGeGenerator:
 
         config = _mini_sim_config(
             scenario="sige",
-            phonon_sigmas={"Si": 0.078, "Ge": 0.065},
+            phonon_sigmas={"Si": 0.078, "Ge": 0.085},
         )
         image = run_stem_simulation(modified, config)
 
@@ -448,7 +448,7 @@ class TestBaTiO3Interface:
 
         config = _mini_sim_config(
             scenario="batio3_interface",
-            phonon_sigmas={"Ba": 0.080, "Ti": 0.055, "O": 0.090},
+            phonon_sigmas={"Ba": 0.080, "Ti": 0.080, "O": 0.090},
         )
         image = run_stem_simulation(defected, config)
         assert image.ndim == 2
@@ -547,7 +547,7 @@ class TestSiGeGradientClustered:
 
         config = _mini_sim_config(
             scenario="sige_gradient_clustered",
-            phonon_sigmas={"Si": 0.078, "Ge": 0.065},
+            phonon_sigmas={"Si": 0.078, "Ge": 0.085},
         )
         image = run_stem_simulation(modified, config)
 

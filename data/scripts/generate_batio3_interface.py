@@ -42,7 +42,6 @@ from sim_utils import (
     DIFFICULTY_PARAMS,
 )
 from generate_batio3 import (
-    build_batio3_cell,
     make_phase_boundary_mask,
     build_composite_structure,
     BTO_PHONON_SIGMAS,

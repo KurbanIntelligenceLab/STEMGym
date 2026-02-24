@@ -27,3 +27,13 @@ class Agent(ABC):
         Returns:
             Action dict compatible with STEMEnv.action_space.
         """
+
+    def _make_done_action(self) -> dict[str, Any]:
+        from stem_gym.envs.stem_env import ActionType
+        return {
+            "action_type": ActionType.DONE,
+            "position": np.array([0.0, 0.0], dtype=np.float32),
+            "zoom": np.array([1.0], dtype=np.float32),
+            "dwell": np.array([1.0], dtype=np.float32),
+            "finding_type": 0,
+        }

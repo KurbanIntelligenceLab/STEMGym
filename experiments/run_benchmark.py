@@ -24,7 +24,7 @@ import json
 import os
 import sys
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -36,8 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from stem_gym.baselines import Agent
 from stem_gym.envs.stem_env import STEMEnv
-from stem_gym.metrics import DECResult
-from stem_gym.runner import BenchmarkResult, EpisodeResult, run_benchmark, run_episode
+from stem_gym.runner import BenchmarkResult, run_benchmark
 from stem_gym.tasks import Task
 
 

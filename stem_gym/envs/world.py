@@ -7,7 +7,6 @@ from typing import Any
 
 import h5py
 import numpy as np
-from scipy.ndimage import gaussian_filter
 
 
 class World:

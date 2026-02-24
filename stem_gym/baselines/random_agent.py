@@ -73,15 +73,6 @@ class RandomAgent(Agent):
                 "finding_type": 0,
             }
 
-    def _make_done_action(self) -> dict[str, Any]:
-        return {
-            "action_type": ActionType.DONE,
-            "position": np.array([0.0, 0.0], dtype=np.float32),
-            "zoom": np.array([1.0], dtype=np.float32),
-            "dwell": np.array([1.0], dtype=np.float32),
-            "finding_type": 0,
-        }
-
     def get_findings(self) -> dict[str, Any]:
         """Get accumulated findings for task scoring."""
         return {

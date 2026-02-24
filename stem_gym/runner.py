@@ -14,9 +14,8 @@ from typing import Any
 import numpy as np
 
 from stem_gym.baselines import Agent
-from stem_gym.envs.stem_env import STEMEnv, ActionType
+from stem_gym.envs.stem_env import STEMEnv
 from stem_gym.metrics import DECResult, compute_dec
-from stem_gym.tasks import Task
 
 
 @dataclass

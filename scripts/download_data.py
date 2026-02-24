@@ -26,15 +26,15 @@ CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
 # Files to download: (remote_path, local_dir, filename)
 WORLD_FILES = [
     "test_world.h5",
-    "srtio3_easy.h5",
-    "srtio3_medium.h5",
-    "srtio3_hard.h5",
-    "batio3_easy.h5",
-    "batio3_medium.h5",
-    "batio3_hard.h5",
-    "sige_easy.h5",
-    "sige_medium.h5",
-    "sige_hard.h5",
+    "srtio3_clustered_easy.h5",
+    "srtio3_clustered_medium.h5",
+    "srtio3_clustered_hard.h5",
+    "batio3_interface_easy.h5",
+    "batio3_interface_medium.h5",
+    "batio3_interface_hard.h5",
+    "sige_gradient_clustered_easy.h5",
+    "sige_gradient_clustered_medium.h5",
+    "sige_gradient_clustered_hard.h5",
 ]
 
 CHECKPOINT_FILES = [

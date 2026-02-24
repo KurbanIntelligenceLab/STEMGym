@@ -33,7 +33,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from sim_utils import (
     SimConfig,
-    GroundTruth,
     record_ground_truth,
     run_stem_simulation,
     write_world_hdf5,

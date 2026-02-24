@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from scipy.ndimage import gaussian_filter, label
+from scipy.ndimage import gaussian_filter
 from skimage.feature import peak_local_max
 
 

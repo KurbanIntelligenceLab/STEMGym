@@ -1,6 +1,5 @@
-# Ablation Study
+# Ablation Study (quick version with corrected world names)
 # Compare STEMAgent variants to measure each component's contribution
-# stem_agent (full) vs no_planner vs no_uncertainty vs rule_planner
 
 name: ablation_study
 
@@ -16,8 +15,8 @@ tasks:
 
 worlds:
   - test_world
-  - srtio3_medium
-  - batio3_medium
+  - srtio3_clustered_medium_verified
+  - batio3_interface_medium_verified
 
 seeds: 5
 budget: 5000.0

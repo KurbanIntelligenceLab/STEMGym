@@ -42,7 +42,6 @@ from sim_utils import (
 )
 from generate_srtio3 import (
     build_srtio3_from_mp,
-    build_srtio3_unit_cell,
     STO_PHONON_SIGMAS,
 )
 

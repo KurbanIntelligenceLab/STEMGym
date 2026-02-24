@@ -24,7 +24,6 @@ from pathlib import Path
 
 import numpy as np
 from ase import Atoms
-from ase.build import bulk
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
