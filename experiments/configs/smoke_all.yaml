@@ -1,0 +1,23 @@
+name: smoke_all
+
+agents:
+  - random
+  - raster
+  - stem_agent
+
+tasks:
+  - defect_census
+  - phase_mapping
+  - targeted
+
+worlds:
+  - batio3_interface_easy_verified
+  - srtio3_clustered_easy_verified
+  - sige_gradient_clustered_easy_verified
+
+seeds: 1
+budget: 3000.0
+max_steps: 50
+score_every_n_acquires: 5
+
+output: results/smoke_all.json

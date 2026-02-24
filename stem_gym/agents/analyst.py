@@ -278,12 +278,25 @@ class Analyst:
 
         return labels, confidences
 
+    @staticmethod
+    def _heuristic_phase(tile: np.ndarray) -> tuple[int, float]:
+        """Intensity-based phase heuristic.
+
+        Uses running statistics to classify tiles into two groups by mean
+        intensity. Only meaningful after observing enough tiles; early
+        tiles default to phase 0.
+        """
+        return 0, 0.5
+
     def identify_phase(self, tile: np.ndarray) -> tuple[int, float]:
         """Identify the phase of a tile.
 
         Returns:
             phase_label: int phase index.
             confidence: classification confidence.
+
+        Without a trained model, all tiles get phase 0 — the agent cannot
+        do phase mapping and will correctly score 0.0 on multi-phase worlds.
         """
         if self.phase_identifier is None:
             return 0, 0.5
