@@ -112,10 +112,8 @@ def main():
         failures += download_checkpoints()
 
     if failures:
-        print(f"\n{failures} download(s) failed. Check your network connection.")
-        print(f"If the dataset is not yet uploaded, generate locally:")
-        print(f"  python data/scripts/generate_test_world.py")
-        sys.exit(1)
+        print(f"\nWARNING: {failures} download(s) failed (some worlds may not be available yet).")
+        print("Continuing with available worlds...")
     else:
         print("\nAll downloads complete.")
 
