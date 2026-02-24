@@ -1,0 +1,26 @@
+# Difficulty Scaling Analysis — BaTiO3 (all 3 difficulty levels)
+# 4 representative agents × 3 worlds × 2 tasks × 5 seeds = 120 episodes
+
+name: difficulty_scaling
+
+agents:
+  - random
+  - raster_equipped
+  - gp_ucb_equipped
+  - stem_agent
+
+tasks:
+  - defect_census
+  - phase_mapping
+
+worlds:
+  - batio3_interface_easy_verified
+  - batio3_interface_medium_verified
+  - batio3_interface_hard_verified
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/difficulty_scaling.json

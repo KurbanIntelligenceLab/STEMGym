@@ -1,0 +1,35 @@
+# Main Benchmark — Defect Census Task
+# 10 agents × 7 worlds × 5 seeds = 350 episodes
+
+name: main_defect_census
+
+agents:
+  - random
+  - raster
+  - gp_ucb
+  - gp_ucb_equipped
+  - raster_equipped
+  - stem_agent
+  - no_planner
+  - no_uncertainty
+  - rule_planner
+  - llm_planner
+
+tasks:
+  - defect_census
+
+worlds:
+  - srtio3_clustered_easy_verified
+  - srtio3_clustered_medium_verified
+  - batio3_interface_easy_verified
+  - batio3_interface_medium_verified
+  - batio3_interface_hard_verified
+  - sige_gradient_clustered_easy_verified
+  - sige_gradient_clustered_medium_verified
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/main_defect_census.json

@@ -1,0 +1,18 @@
+name: preflight_validation
+agents:
+  - random
+  - raster
+  - stem_agent
+tasks:
+  - defect_census
+  - phase_mapping
+  - targeted
+worlds:
+  - srtio3_clustered_easy_verified
+  - batio3_interface_medium_verified
+  - sige_gradient_clustered_easy_verified
+seeds: 1
+budget: 1000.0
+max_steps: 50
+score_every_n_acquires: 3
+output: results/preflight.json

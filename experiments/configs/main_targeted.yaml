@@ -1,0 +1,31 @@
+# Main Benchmark — Targeted Characterization Task
+# 10 agents × 2 SiGe worlds × 5 seeds = 100 episodes
+# Targeted task only scores non-trivially on SiGe (which has substitution defects)
+
+name: main_targeted
+
+agents:
+  - random
+  - raster
+  - gp_ucb
+  - gp_ucb_equipped
+  - raster_equipped
+  - stem_agent
+  - no_planner
+  - no_uncertainty
+  - rule_planner
+  - llm_planner
+
+tasks:
+  - targeted
+
+worlds:
+  - sige_gradient_clustered_easy_verified
+  - sige_gradient_clustered_medium_verified
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/main_targeted.json
