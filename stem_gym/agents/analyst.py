@@ -7,7 +7,6 @@ the same interface as SimpleAnalyst (analyze_tile → AnalysisResult).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import torch
@@ -66,6 +65,12 @@ class Analyst:
         if self.phase_identifier is not None:
             self.phase_identifier = self.phase_identifier.to(self.device).eval()
 
+        # Track degenerate model detection (always predicts same class)
+        self._defect_clf_check_count = 0
+        self._defect_clf_pred_counts: dict[int, int] = {}
+        self._phase_id_check_count = 0
+        self._phase_id_pred_counts: dict[int, int] = {}
+
         # Accumulated results
         self._tile_results: list[AnalysisResult] = []
         self._all_atom_positions_nm: list[np.ndarray] = []
@@ -75,6 +80,10 @@ class Analyst:
         self._tile_results.clear()
         self._all_atom_positions_nm.clear()
         self._all_defect_labels.clear()
+        self._defect_clf_check_count = 0
+        self._defect_clf_pred_counts.clear()
+        self._phase_id_check_count = 0
+        self._phase_id_pred_counts.clear()
 
     @classmethod
     def from_checkpoint(cls, checkpoint_dir: str | Path, device: str = "cpu") -> "Analyst":
@@ -207,12 +216,23 @@ class Analyst:
             return np.empty(0, dtype=np.int32), np.empty(0, dtype=np.float32)
 
         if self.defect_classifier is None:
-            # Fallback: intensity-based z-score classification
+            # Fallback: intensity-based z-score classification.
+            # When using the trained atom finder, positions may include
+            # inter-column spots with low intensity. Filter to high-
+            # intensity atoms (real column peaks) for robust z-scores.
             intensities = np.array(
                 [tile[int(r), int(c)] for r, c in positions], dtype=np.float32
             )
-            mean_i = intensities.mean()
-            std_i = max(intensities.std(), 1e-6)
+            # Use only atoms above median intensity for statistics
+            # (inter-column spots pull the mean down and inflate std)
+            median_i = np.median(intensities)
+            bright_mask = intensities >= median_i
+            if bright_mask.sum() > 3:
+                ref_intensities = intensities[bright_mask]
+            else:
+                ref_intensities = intensities
+            mean_i = ref_intensities.mean()
+            std_i = max(ref_intensities.std(), 1e-6)
             zscores = (intensities - mean_i) / std_i
 
             labels = np.zeros(len(positions), dtype=np.int32)
@@ -239,6 +259,23 @@ class Analyst:
 
         labels = probs.argmax(dim=-1).cpu().numpy().astype(np.int32)
         confidences = probs.max(dim=-1).values.cpu().numpy().astype(np.float32)
+
+        # Detect degenerate model: if after 50+ atoms all predictions are
+        # the same class, the model is broken — disable and use heuristic
+        for lbl in labels:
+            self._defect_clf_pred_counts[int(lbl)] = (
+                self._defect_clf_pred_counts.get(int(lbl), 0) + 1
+            )
+        self._defect_clf_check_count += len(labels)
+        if self._defect_clf_check_count >= 50 and len(self._defect_clf_pred_counts) == 1:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Defect classifier always predicts class %d — falling back to heuristic",
+                next(iter(self._defect_clf_pred_counts)),
+            )
+            self.defect_classifier = None
+            return self.classify_defects(tile, positions)
+
         return labels, confidences
 
     def identify_phase(self, tile: np.ndarray) -> tuple[int, float]:
@@ -268,6 +305,22 @@ class Analyst:
 
         label = probs.argmax(dim=-1).item()
         conf = probs.max(dim=-1).values.item()
+
+        # Detect degenerate model: if after 5+ tiles all predictions are
+        # the same class, the model is broken — disable and use heuristic
+        self._phase_id_pred_counts[label] = (
+            self._phase_id_pred_counts.get(label, 0) + 1
+        )
+        self._phase_id_check_count += 1
+        if self._phase_id_check_count >= 5 and len(self._phase_id_pred_counts) == 1:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Phase identifier always predicts class %d — falling back to heuristic",
+                next(iter(self._phase_id_pred_counts)),
+            )
+            self.phase_identifier = None
+            return 0, 0.5
+
         return int(label), float(conf)
 
     def analyze_tile(

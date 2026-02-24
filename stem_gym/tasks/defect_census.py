@@ -103,7 +103,7 @@ class DefectCensusTask(Task):
         # Ground truth census
         gt_census: dict[str, int] = {}
         for t in gt_types:
-            t_str = str(t)
+            t_str = t.decode("utf-8") if isinstance(t, bytes) else str(t)
             if t_str != "pristine":
                 gt_census[t_str] = gt_census.get(t_str, 0) + 1
 

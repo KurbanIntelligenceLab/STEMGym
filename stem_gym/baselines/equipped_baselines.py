@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import torch
 
 from stem_gym.baselines import Agent
 from stem_gym.agents.analyst import Analyst
+from stem_gym.baselines.gp_ucb import GPUCBAgent
 from stem_gym.envs.stem_env import ActionType
 
 
@@ -35,14 +35,17 @@ def _assemble_findings(
 
     Shared by both equipped agents — same logic as STEMAgent.get_findings().
     """
-    # Phase map
+    # Phase map — only return if agent observed >=2 distinct phases
+    # (mirrors STEMAgent.get_findings(); avoids false-positive on single-phase worlds)
     phase_map = None
     if tile_phases:
-        gh, gw = grid_shape
-        phase_map = np.zeros((gh, gw), dtype=np.int32)
-        for (r, c), phase in tile_phases.items():
-            if 0 <= r < gh and 0 <= c < gw:
-                phase_map[r, c] = phase
+        distinct_phases = set(tile_phases.values())
+        if len(distinct_phases) >= 2:
+            gh, gw = grid_shape
+            phase_map = np.zeros((gh, gw), dtype=np.int32)
+            for (r, c), phase in tile_phases.items():
+                if 0 <= r < gh and 0 <= c < gw:
+                    phase_map[r, c] = phase
 
     # Defect positions from analyst accumulated state
     defect_positions = []
@@ -96,141 +99,27 @@ def _load_analyst(checkpoint_dir: str | Path | None) -> Analyst:
 # ---------------------------------------------------------------------------
 
 
-class GPUCBEquippedAgent(Agent):
+class GPUCBEquippedAgent(GPUCBAgent):
     """GP-UCB navigation with the trained Analyst ensemble.
 
-    Navigation logic is identical to GPUCBAgent: GP-UCB acquisition
-    function over tile interestingness (intensity std), fixed beta=2.0.
-    The only difference is using the trained Analyst instead of SimpleAnalyst,
-    with tile_position_nm passed for world-coordinate defect localization.
+    Inherits all navigation/GP logic from GPUCBAgent. Overrides analyst
+    initialization (trained vs simple) and tile analysis (passes position
+    for world-coordinate defect localization).
     """
 
-    def __init__(
-        self,
-        beta: float = 2.0,
-        seed: int = 42,
-        initial_random: int = 3,
-        checkpoint_dir: str | Path | None = None,
-    ):
-        self.beta = beta
-        self.seed = seed
-        self.initial_random = initial_random
+    def __init__(self, beta=2.0, seed=42, initial_random=3, checkpoint_dir=None):
+        super().__init__(beta=beta, seed=seed, initial_random=initial_random)
         self.analyst = _load_analyst(checkpoint_dir)
-        self.rng = np.random.default_rng(seed)
-
-        # GP data
-        self._X: list[list[float]] = []
-        self._Y: list[float] = []
-        self._grid_shape: tuple[int, int] = (1, 1)
-        self._fov_nm: tuple[float, float] = (1.0, 1.0)
         self._pixel_size_nm: float = 0.005
-        self._navigate_phase = True
-        self._step = 0
-        self._gp_model = None
-        self._visited_set: set[tuple[int, int]] = set()
         self._tile_phases: dict[tuple[int, int], int] = {}
 
-    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
-        self.analyst.reset()
-        self._X.clear()
-        self._Y.clear()
-        self._grid_shape = obs["visited_mask"].shape
-        self._fov_nm = info.get("fov_nm", (100.0, 100.0))
+    def reset(self, obs, info):
+        super().reset(obs, info)
         self._pixel_size_nm = info.get("pixel_size_nm", 0.005)
-        self._navigate_phase = True
-        self._step = 0
-        self._gp_model = None
-        self._visited_set.clear()
         self._tile_phases.clear()
         self.rng = np.random.default_rng(self.seed)
 
-    def _fit_gp(self) -> None:
-        """Fit GP model to observed data."""
-        if len(self._X) < 2:
-            return
-
-        from botorch.models import SingleTaskGP
-        from botorch.fit import fit_gpytorch_mll
-        from gpytorch.mlls import ExactMarginalLogLikelihood
-
-        train_X = torch.tensor(self._X, dtype=torch.float64)
-        train_Y = torch.tensor(self._Y, dtype=torch.float64).unsqueeze(-1)
-
-        y_mean = train_Y.mean()
-        y_std = train_Y.std().clamp(min=1e-6)
-        train_Y_norm = (train_Y - y_mean) / y_std
-
-        try:
-            self._gp_model = SingleTaskGP(train_X, train_Y_norm)
-            mll = ExactMarginalLogLikelihood(
-                self._gp_model.likelihood, self._gp_model
-            )
-            fit_gpytorch_mll(mll)
-        except Exception:
-            self._gp_model = SingleTaskGP(train_X, train_Y_norm)
-
-    def _select_next_position(self, obs: dict[str, np.ndarray]) -> tuple[float, float]:
-        """Select next position using GP-UCB."""
-        grid_h, grid_w = self._grid_shape
-        visited = obs["visited_mask"]
-
-        if self._gp_model is None or self._step < self.initial_random:
-            unvisited = np.argwhere(visited < 0.5)
-            if len(unvisited) == 0:
-                unvisited = np.argwhere(np.ones_like(visited))
-            idx = self.rng.integers(0, len(unvisited))
-            row, col = unvisited[idx]
-            return self._grid_to_nm(int(row), int(col))
-
-        candidates = []
-        for r in range(grid_h):
-            for c in range(grid_w):
-                if (r, c) not in self._visited_set:
-                    candidates.append((r, c))
-
-        if not candidates:
-            r = self.rng.integers(0, grid_h)
-            c = self.rng.integers(0, grid_w)
-            return self._grid_to_nm(r, c)
-
-        cand_norm = torch.tensor(
-            [[r / max(grid_h - 1, 1), c / max(grid_w - 1, 1)] for r, c in candidates],
-            dtype=torch.float64,
-        )
-
-        self._gp_model.eval()
-        with torch.no_grad():
-            posterior = self._gp_model.posterior(cand_norm)
-            mean = posterior.mean.squeeze(-1)
-            std = posterior.variance.sqrt().squeeze(-1)
-
-        ucb = mean + self.beta * std
-        best_idx = ucb.argmax().item()
-        row, col = candidates[best_idx]
-        return self._grid_to_nm(row, col)
-
-    def _grid_to_nm(self, row: int, col: int) -> tuple[float, float]:
-        """Convert grid indices to nm coordinates."""
-        grid_h, grid_w = self._grid_shape
-        x_nm = (col + 0.5) / grid_w * self._fov_nm[1]
-        y_nm = (row + 0.5) / grid_h * self._fov_nm[0]
-        return (x_nm, y_nm)
-
-    def _nm_to_grid(self, x_nm: float, y_nm: float) -> tuple[int, int]:
-        """Convert nm coordinates to grid indices."""
-        grid_h, grid_w = self._grid_shape
-        col = int(np.clip(x_nm / self._fov_nm[1] * grid_w, 0, grid_w - 1))
-        row = int(np.clip(y_nm / self._fov_nm[0] * grid_h, 0, grid_h - 1))
-        return row, col
-
-    @staticmethod
-    def _tile_interestingness(tile: np.ndarray) -> float:
-        """Intensity std as GP objective — identical to GPUCBAgent."""
-        if tile.max() <= 0:
-            return 0.0
-        return float(np.std(tile))
-
-    def act(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> dict[str, Any]:
+    def act(self, obs, info):
         self._step += 1
         budget_frac = float(obs["budget_remaining"][0])
 
@@ -249,27 +138,20 @@ class GPUCBEquippedAgent(Agent):
             }
         else:
             self._navigate_phase = True
-
             tile = obs.get("tile")
             if tile is not None and tile.max() > 0:
                 pos = obs["position"]
                 x_nm, y_nm = float(pos[0]), float(pos[1])
 
-                # Analyze with trained analyst (with position for world coords)
                 result = self.analyst.analyze_tile(
-                    tile,
-                    tile_position_nm=(x_nm, y_nm),
+                    tile, tile_position_nm=(x_nm, y_nm),
                     pixel_size_nm=self._pixel_size_nm,
                 )
-
-                # Record phase label for phase map
                 row, col = self._nm_to_grid(x_nm, y_nm)
                 self._tile_phases[(row, col)] = result.phase_label
 
-                # Feed interestingness to GP (same objective as GPUCBAgent)
                 interestingness = self._tile_interestingness(tile)
                 self._visited_set.add((row, col))
-
                 grid_h, grid_w = self._grid_shape
                 x_norm = row / max(grid_h - 1, 1)
                 y_norm = col / max(grid_w - 1, 1)
@@ -287,16 +169,7 @@ class GPUCBEquippedAgent(Agent):
                 "finding_type": 0,
             }
 
-    def _make_done_action(self) -> dict[str, Any]:
-        return {
-            "action_type": ActionType.DONE,
-            "position": np.array([0.0, 0.0], dtype=np.float32),
-            "zoom": np.array([1.0], dtype=np.float32),
-            "dwell": np.array([1.0], dtype=np.float32),
-            "finding_type": 0,
-        }
-
-    def get_findings(self) -> dict[str, Any]:
+    def get_findings(self):
         return _assemble_findings(self.analyst, self._tile_phases, self._grid_shape)
 
 
@@ -397,15 +270,6 @@ class RasterEquippedAgent(Agent):
                 "dwell": np.array([1.0], dtype=np.float32),
                 "finding_type": 0,
             }
-
-    def _make_done_action(self) -> dict[str, Any]:
-        return {
-            "action_type": ActionType.DONE,
-            "position": np.array([0.0, 0.0], dtype=np.float32),
-            "zoom": np.array([1.0], dtype=np.float32),
-            "dwell": np.array([1.0], dtype=np.float32),
-            "finding_type": 0,
-        }
 
     def get_findings(self) -> dict[str, Any]:
         return _assemble_findings(self.analyst, self._tile_phases, self._grid_shape)

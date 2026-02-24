@@ -1,9 +1,0 @@
-name: tight_budget_1000
-agents: [gp_ucb, gp_ucb_equipped, raster_equipped, stem_agent, no_planner]
-tasks: [defect_census, phase_mapping, targeted]
-worlds: [test_world, srtio3_medium, batio3_medium, sige_medium]
-seeds: 3
-budget: 1000.0
-max_steps: 100
-score_every_n_acquires: 2
-output: results/tight_budget_1000.json

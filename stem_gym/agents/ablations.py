@@ -12,8 +12,6 @@ All implement the Agent protocol for use with run_benchmark().
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 
 from stem_gym.agents.analyst import Analyst
@@ -116,7 +114,7 @@ class STEMAgentLLM(STEMAgent):
 
     def __init__(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "google/gemini-3-flash-preview",
         invoke_every: int = 10,
         seed: int = 42,
     ):

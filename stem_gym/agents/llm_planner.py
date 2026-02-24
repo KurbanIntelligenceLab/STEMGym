@@ -80,7 +80,7 @@ class LLMPlanner:
     issues directives (mode changes, beta adjustments, hypotheses).
 
     Args:
-        model: OpenRouter model identifier (e.g. "anthropic/claude-sonnet-4-20250514",
+        model: OpenRouter model identifier (e.g. "google/gemini-3-flash-preview",
             "openai/gpt-4o-mini").
         invoke_every: Invoke LLM every N orchestrator steps.
         api_key: OpenRouter API key. If None, reads OPENROUTER_API_KEY env var.
@@ -91,7 +91,7 @@ class LLMPlanner:
 
     def __init__(
         self,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str = "google/gemini-3-flash-preview",
         invoke_every: int = 10,
         api_key: str | None = None,
         fallback_planner: Planner | None = None,

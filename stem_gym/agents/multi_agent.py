@@ -250,11 +250,13 @@ class STEMAgent(Agent):
         # Build phase map from tile-level phase labels
         phase_map = None
         if self._state is not None and self._tile_phases:
-            gh, gw = self._state.visited_mask.shape
-            phase_map = np.zeros((gh, gw), dtype=np.int32)
-            for (r, c), phase in self._tile_phases.items():
-                if 0 <= r < gh and 0 <= c < gw:
-                    phase_map[r, c] = phase
+            distinct_phases = set(self._tile_phases.values())
+            if len(distinct_phases) >= 2:
+                gh, gw = self._state.visited_mask.shape
+                phase_map = np.zeros((gh, gw), dtype=np.int32)
+                for (r, c), phase in self._tile_phases.items():
+                    if 0 <= r < gh and 0 <= c < gw:
+                        phase_map[r, c] = phase
 
         # Collect defect positions from analyst — iterate positions and labels
         # in lockstep across all tiles

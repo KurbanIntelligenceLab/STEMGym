@@ -32,7 +32,10 @@ class TargetedTask(Task):
             return 0.0
 
         # Find target atoms in ground truth
-        target_mask = np.array([str(t) == self.target_type for t in gt_types])
+        target_mask = np.array([
+            (t.decode("utf-8") if isinstance(t, bytes) else str(t)) == self.target_type
+            for t in gt_types
+        ])
         if not np.any(target_mask):
             # No exact match — try any non-pristine defect as target
             gt_atom_types = ground_truth.get("atom_types", np.array([]))
