@@ -421,6 +421,115 @@ def _crop_atoms_xy(atoms: Atoms, x0: float, y0: float,
     return cropped
 
 
+def _compute_tiled_grid_params(atoms: Atoms, config: SimConfig) -> dict:
+    """Compute tiling grid parameters for a large-FOV simulation."""
+    cell = atoms.cell.array
+    extent_x = float(np.linalg.norm(cell[0]))
+    extent_y = float(np.linalg.norm(cell[1]))
+
+    tile_ang = config.sim_tile_nm * 10.0
+    overlap_ang = config.sim_tile_overlap_nm * 10.0
+    stride_ang = tile_ang - overlap_ang
+
+    n_tiles_x = max(1, int(np.ceil((extent_x - overlap_ang) / stride_ang)))
+    n_tiles_y = max(1, int(np.ceil((extent_y - overlap_ang) / stride_ang)))
+
+    tile_x = (extent_x + overlap_ang * (n_tiles_x - 1)) / n_tiles_x if n_tiles_x > 1 else extent_x
+    tile_y = (extent_y + overlap_ang * (n_tiles_y - 1)) / n_tiles_y if n_tiles_y > 1 else extent_y
+    stride_x = tile_x - overlap_ang if n_tiles_x > 1 else extent_x
+    stride_y = tile_y - overlap_ang if n_tiles_y > 1 else extent_y
+
+    total_tiles = n_tiles_x * n_tiles_y
+
+    interpolation = config.interpolation
+    if config.device == "gpu":
+        interpolation = max(interpolation, 4)
+    output_sampling = config.sampling * interpolation
+
+    full_px_x = int(round(extent_x / output_sampling))
+    full_px_y = int(round(extent_y / output_sampling))
+    overlap_px = int(round(overlap_ang / output_sampling))
+
+    return {
+        'extent_x': extent_x, 'extent_y': extent_y,
+        'tile_x': tile_x, 'tile_y': tile_y,
+        'stride_x': stride_x, 'stride_y': stride_y,
+        'n_tiles_x': n_tiles_x, 'n_tiles_y': n_tiles_y,
+        'total_tiles': total_tiles,
+        'overlap_ang': overlap_ang,
+        'overlap_px': overlap_px,
+        'output_sampling': output_sampling,
+        'full_px_x': full_px_x, 'full_px_y': full_px_y,
+    }
+
+
+def _run_tile_range(
+    atoms: Atoms,
+    config: SimConfig,
+    grid: dict,
+    start_tile: int,
+    end_tile: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Simulate tiles [start_tile, end_tile) and return unnormalized (image, weights).
+
+    Tiles are indexed 0-based in row-major order: idx = ti * n_tiles_y + tj.
+    """
+    image = np.zeros((grid['full_px_y'], grid['full_px_x']), dtype=np.float64)
+    weights = np.zeros((grid['full_px_y'], grid['full_px_x']), dtype=np.float64)
+
+    for ti in range(grid['n_tiles_x']):
+        for tj in range(grid['n_tiles_y']):
+            tile_idx = ti * grid['n_tiles_y'] + tj
+            if tile_idx < start_tile or tile_idx >= end_tile:
+                continue
+
+            x0 = ti * grid['stride_x']
+            y0 = tj * grid['stride_y']
+            x0 = min(x0, grid['extent_x'] - grid['tile_x'])
+            y0 = min(y0, grid['extent_y'] - grid['tile_y'])
+
+            logger.info(
+                f"  Tile {tile_idx + 1}/{grid['total_tiles']}: "
+                f"origin=({x0:.0f}, {y0:.0f}) Å"
+            )
+
+            tile_atoms = _crop_atoms_xy(atoms, x0, y0, grid['tile_x'], grid['tile_y'])
+            tile_image = _run_single_tile_simulation(tile_atoms, config)
+
+            px_x0 = int(round(x0 / grid['output_sampling']))
+            px_y0 = int(round(y0 / grid['output_sampling']))
+            th, tw = tile_image.shape
+
+            # Build blend weights for this tile
+            w = np.ones_like(tile_image, dtype=np.float64)
+            olap_w = min(grid['overlap_px'], tw // 3) if grid['overlap_px'] > 0 else 0
+            olap_h = min(grid['overlap_px'], th // 3) if grid['overlap_px'] > 0 else 0
+            if olap_w > 0:
+                ramp_w = np.linspace(0, 1, olap_w)
+                if ti > 0:
+                    w[:, :olap_w] *= ramp_w[np.newaxis, :]
+                if ti < grid['n_tiles_x'] - 1:
+                    w[:, -olap_w:] *= ramp_w[np.newaxis, ::-1]
+            if olap_h > 0:
+                ramp_h = np.linspace(0, 1, olap_h)
+                if tj > 0:
+                    w[:olap_h, :] *= ramp_h[:, np.newaxis]
+                if tj < grid['n_tiles_y'] - 1:
+                    w[-olap_h:, :] *= ramp_h[::-1, np.newaxis]
+
+            # Accumulate
+            py_end = min(px_y0 + th, grid['full_px_y'])
+            px_end = min(px_x0 + tw, grid['full_px_x'])
+            sh = py_end - px_y0
+            sw = px_end - px_x0
+            image[px_y0:py_end, px_x0:px_end] += tile_image[:sh, :sw] * w[:sh, :sw]
+            weights[px_y0:py_end, px_x0:px_end] += w[:sh, :sw]
+
+            logger.info(f"  Tile {tile_idx + 1}/{grid['total_tiles']} complete.")
+
+    return image, weights
+
+
 def run_stem_simulation(
     atoms: Atoms,
     config: SimConfig,
@@ -453,91 +562,108 @@ def run_stem_simulation(
         return _run_single_tile_simulation(atoms, config)
 
     # --- Tiled simulation ---
-    stride_ang = tile_ang - overlap_ang
-
-    n_tiles_x = max(1, int(np.ceil((extent_x - overlap_ang) / stride_ang)))
-    n_tiles_y = max(1, int(np.ceil((extent_y - overlap_ang) / stride_ang)))
-
-    # Recompute tile_ang to cover the full extent evenly
-    tile_x = (extent_x + overlap_ang * (n_tiles_x - 1)) / n_tiles_x if n_tiles_x > 1 else extent_x
-    tile_y = (extent_y + overlap_ang * (n_tiles_y - 1)) / n_tiles_y if n_tiles_y > 1 else extent_y
-    stride_x = tile_x - overlap_ang if n_tiles_x > 1 else extent_x
-    stride_y = tile_y - overlap_ang if n_tiles_y > 1 else extent_y
-
-    total_tiles = n_tiles_x * n_tiles_y
+    grid = _compute_tiled_grid_params(atoms, config)
     logger.info(
-        f"Tiling simulation: {n_tiles_x}x{n_tiles_y} = {total_tiles} tiles, "
-        f"tile={tile_x:.0f}x{tile_y:.0f} Å, stride={stride_x:.0f}x{stride_y:.0f} Å, "
-        f"overlap={overlap_ang:.0f} Å"
+        f"Tiling simulation: {grid['n_tiles_x']}x{grid['n_tiles_y']} = "
+        f"{grid['total_tiles']} tiles, "
+        f"tile={grid['tile_x']:.0f}x{grid['tile_y']:.0f} Å, "
+        f"stride={grid['stride_x']:.0f}x{grid['stride_y']:.0f} Å, "
+        f"overlap={grid['overlap_ang']:.0f} Å"
     )
 
-    # PRISM output pixel size: sampling * interpolation
-    interpolation = config.interpolation
-    if config.device == "gpu":
-        interpolation = max(interpolation, 4)
-    output_sampling = config.sampling * interpolation  # Angstrom per output pixel
-
-    # Output image size (at PRISM output resolution)
-    full_px_x = int(round(extent_x / output_sampling))
-    full_px_y = int(round(extent_y / output_sampling))
-    image = np.zeros((full_px_y, full_px_x), dtype=np.float64)
-    weights = np.zeros((full_px_y, full_px_x), dtype=np.float64)
-
-    overlap_px = int(round(overlap_ang / output_sampling))
-
-    for ti in range(n_tiles_x):
-        for tj in range(n_tiles_y):
-            tile_idx = ti * n_tiles_y + tj + 1
-            x0 = ti * stride_x
-            y0 = tj * stride_y
-            # Clamp to extent
-            x0 = min(x0, extent_x - tile_x)
-            y0 = min(y0, extent_y - tile_y)
-
-            logger.info(f"  Tile {tile_idx}/{total_tiles}: "
-                        f"origin=({x0:.0f}, {y0:.0f}) Å")
-
-            tile_atoms = _crop_atoms_xy(atoms, x0, y0, tile_x, tile_y)
-            tile_image = _run_single_tile_simulation(tile_atoms, config)
-
-            # Map tile pixels into the full image (using output pixel size)
-            px_x0 = int(round(x0 / output_sampling))
-            px_y0 = int(round(y0 / output_sampling))
-            th, tw = tile_image.shape
-
-            # Build blend weights for this tile
-            w = np.ones_like(tile_image, dtype=np.float64)
-            # Clamp overlap to actual tile dims
-            olap_w = min(overlap_px, tw // 3) if overlap_px > 0 else 0
-            olap_h = min(overlap_px, th // 3) if overlap_px > 0 else 0
-            if olap_w > 0:
-                ramp_w = np.linspace(0, 1, olap_w)
-                if ti > 0:
-                    w[:, :olap_w] *= ramp_w[np.newaxis, :]
-                if ti < n_tiles_x - 1:
-                    w[:, -olap_w:] *= ramp_w[np.newaxis, ::-1]
-            if olap_h > 0:
-                ramp_h = np.linspace(0, 1, olap_h)
-                if tj > 0:
-                    w[:olap_h, :] *= ramp_h[:, np.newaxis]
-                if tj < n_tiles_y - 1:
-                    w[-olap_h:, :] *= ramp_h[::-1, np.newaxis]
-
-            # Accumulate
-            py_end = min(px_y0 + th, full_px_y)
-            px_end = min(px_x0 + tw, full_px_x)
-            sh = py_end - px_y0
-            sw = px_end - px_x0
-            image[px_y0:py_end, px_x0:px_end] += tile_image[:sh, :sw] * w[:sh, :sw]
-            weights[px_y0:py_end, px_x0:px_end] += w[:sh, :sw]
-
-            logger.info(f"  Tile {tile_idx}/{total_tiles} complete.")
+    image, weights = _run_tile_range(atoms, config, grid, 0, grid['total_tiles'])
 
     # Normalize by weights
     mask = weights > 0
     image[mask] /= weights[mask]
 
     return image.astype(np.float32)
+
+
+def run_stem_simulation_shard(
+    atoms: Atoms,
+    config: SimConfig,
+    shard_id: int,
+    total_shards: int,
+    output_path: Path,
+) -> None:
+    """Run a shard of the tiled STEM simulation, saving partial results.
+
+    Computes tiles [start, end) where the range is determined by evenly
+    dividing total_tiles across total_shards.  Saves unnormalized
+    (image, weights) arrays to a .npz file for later merging.
+
+    Args:
+        atoms: Structure to simulate.
+        config: Simulation configuration.
+        shard_id: 0-based shard index.
+        total_shards: Total number of shards.
+        output_path: Path to write .npz file.
+    """
+    grid = _compute_tiled_grid_params(atoms, config)
+    total_tiles = grid['total_tiles']
+
+    start = shard_id * total_tiles // total_shards
+    end = (shard_id + 1) * total_tiles // total_shards
+
+    logger.info(
+        f"Shard {shard_id}/{total_shards}: tiles {start}-{end - 1} of {total_tiles} "
+        f"({grid['n_tiles_x']}x{grid['n_tiles_y']} grid)"
+    )
+
+    image, weights = _run_tile_range(atoms, config, grid, start, end)
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(str(output_path), image=image, weights=weights)
+    logger.info(f"Saved shard {shard_id} to {output_path}")
+
+
+def merge_simulation_shards(shard_paths: list[Path | str]) -> np.ndarray:
+    """Load shard .npz files, sum (image, weights), normalize, return image.
+
+    Each shard file must contain 'image' and 'weights' arrays of the same
+    shape, produced by run_stem_simulation_shard().
+
+    Args:
+        shard_paths: Paths to shard .npz files.
+
+    Returns:
+        Normalized HAADF image as (H, W) float32 array.
+    """
+    image = None
+    weights = None
+
+    for p in shard_paths:
+        logger.info(f"Loading shard: {p}")
+        data = np.load(str(p))
+        if image is None:
+            image = data['image'].astype(np.float64)
+            weights = data['weights'].astype(np.float64)
+        else:
+            image += data['image'].astype(np.float64)
+            weights += data['weights'].astype(np.float64)
+
+    mask = weights > 0
+    image[mask] /= weights[mask]
+
+    return image.astype(np.float32)
+
+
+def add_shard_args(parser) -> None:
+    """Add --shard, --total-shards, --merge-shards CLI flags to an argparser."""
+    parser.add_argument(
+        "--shard", type=int, default=None,
+        help="Shard index (0-based). Use with --total-shards.",
+    )
+    parser.add_argument(
+        "--total-shards", type=int, default=None,
+        help="Total number of shards. Use with --shard.",
+    )
+    parser.add_argument(
+        "--merge-shards", type=int, default=None,
+        help="Merge N shard .npz files into final HDF5.",
+    )
 
 
 # ---------------------------------------------------------------------------

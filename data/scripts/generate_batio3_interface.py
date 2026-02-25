@@ -40,7 +40,10 @@ from sim_utils import (
     plant_vacancies_weighted,
     record_ground_truth,
     run_stem_simulation,
+    run_stem_simulation_shard,
+    merge_simulation_shards,
     write_world_hdf5,
+    add_shard_args,
     DIFFICULTY_PARAMS,
 )
 
@@ -301,6 +304,9 @@ def generate_batio3_interface(
     device: str = "cpu",
     seed: int = 42,
     fov_nm: float = 100.0,
+    shard_id: int | None = None,
+    total_shards: int | None = None,
+    merge_shards: int | None = None,
 ) -> Path:
     """Generate BaTiO3 world with phase boundaries and clustered O vacancies.
 
@@ -403,9 +409,22 @@ def generate_batio3_interface(
     )
 
     # --- 6. Run STEM simulation ---
-    logger.info("Running STEM-HAADF simulation...")
-    image = run_stem_simulation(defected, config)
-    logger.info(f"Simulation complete: {image.shape}")
+    if shard_id is not None and total_shards is not None:
+        stem = str(output_path.with_suffix(''))
+        npz_path = Path(f"{stem}_shard{shard_id}.npz")
+        logger.info(f"Running shard {shard_id}/{total_shards}...")
+        run_stem_simulation_shard(defected, config, shard_id, total_shards, npz_path)
+        return output_path
+
+    if merge_shards is not None:
+        stem = str(output_path.with_suffix(''))
+        shard_paths = [Path(f"{stem}_shard{i}.npz") for i in range(merge_shards)]
+        logger.info(f"Merging {merge_shards} shards...")
+        image = merge_simulation_shards(shard_paths)
+    else:
+        logger.info("Running STEM-HAADF simulation...")
+        image = run_stem_simulation(defected, config)
+    logger.info(f"Image shape: {image.shape}")
 
     # --- 7. Resize phase map to match actual image ---
     from scipy.ndimage import zoom as scipy_zoom
@@ -433,6 +452,7 @@ def main():
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--fov-nm", type=float, default=100.0)
+    add_shard_args(parser)
     parser.add_argument(
         "--all-difficulties", action="store_true",
         help="Generate all 3 difficulty levels",
@@ -447,6 +467,8 @@ def main():
             generate_batio3_interface(
                 difficulty=diff, output_path=out,
                 device=args.device, seed=args.seed, fov_nm=args.fov_nm,
+                shard_id=args.shard, total_shards=args.total_shards,
+                merge_shards=args.merge_shards,
             )
     else:
         generate_batio3_interface(
@@ -455,6 +477,9 @@ def main():
             device=args.device,
             seed=args.seed,
             fov_nm=args.fov_nm,
+            shard_id=args.shard,
+            total_shards=args.total_shards,
+            merge_shards=args.merge_shards,
         )
 
 

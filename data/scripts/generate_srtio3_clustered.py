@@ -39,7 +39,10 @@ from sim_utils import (
     plant_vacancies_weighted,
     record_ground_truth,
     run_stem_simulation,
+    run_stem_simulation_shard,
+    merge_simulation_shards,
     write_world_hdf5,
+    add_shard_args,
     DIFFICULTY_PARAMS,
 )
 
@@ -155,6 +158,9 @@ def generate_srtio3_clustered(
     mp_api_key: str | None = None,
     seed: int = 42,
     fov_nm: float = 100.0,
+    shard_id: int | None = None,
+    total_shards: int | None = None,
+    merge_shards: int | None = None,
 ) -> Path:
     """Generate SrTiO3 world with clustered O vacancies along a grain boundary.
 
@@ -242,9 +248,22 @@ def generate_srtio3_clustered(
     )
 
     # --- 6. Run STEM simulation ---
-    logger.info("Running STEM-HAADF simulation (this may take a while)...")
-    image = run_stem_simulation(defected, config)
-    logger.info(f"Simulation complete: image shape={image.shape}")
+    if shard_id is not None and total_shards is not None:
+        stem = str(output_path.with_suffix(''))
+        npz_path = Path(f"{stem}_shard{shard_id}.npz")
+        logger.info(f"Running shard {shard_id}/{total_shards}...")
+        run_stem_simulation_shard(defected, config, shard_id, total_shards, npz_path)
+        return output_path
+
+    if merge_shards is not None:
+        stem = str(output_path.with_suffix(''))
+        shard_paths = [Path(f"{stem}_shard{i}.npz") for i in range(merge_shards)]
+        logger.info(f"Merging {merge_shards} shards...")
+        image = merge_simulation_shards(shard_paths)
+    else:
+        logger.info("Running STEM-HAADF simulation (this may take a while)...")
+        image = run_stem_simulation(defected, config)
+    logger.info(f"Image shape: {image.shape}")
 
     # --- 7. Write HDF5 ---
     write_world_hdf5(output_path, image, ground_truth, config)
@@ -264,6 +283,7 @@ def main():
     parser.add_argument("--mp-api-key", type=str, default=None)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--fov-nm", type=float, default=100.0)
+    add_shard_args(parser)
     parser.add_argument(
         "--all-difficulties", action="store_true",
         help="Generate all 3 difficulty levels",
@@ -279,6 +299,8 @@ def main():
                 difficulty=diff, output_path=out,
                 device=args.device, mp_api_key=args.mp_api_key,
                 seed=args.seed, fov_nm=args.fov_nm,
+                shard_id=args.shard, total_shards=args.total_shards,
+                merge_shards=args.merge_shards,
             )
     else:
         generate_srtio3_clustered(
@@ -288,6 +310,9 @@ def main():
             mp_api_key=args.mp_api_key,
             seed=args.seed,
             fov_nm=args.fov_nm,
+            shard_id=args.shard,
+            total_shards=args.total_shards,
+            merge_shards=args.merge_shards,
         )
 
 
