@@ -27,6 +27,7 @@ sim = [
     "pymatgen>=2023.5",
     "mp-api>=0.33",
     "ase>=3.22",
+    "cupy-cuda12x>=13.0",
 ]
 replay = [
     "py4dstem>=0.14",
