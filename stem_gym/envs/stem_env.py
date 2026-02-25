@@ -247,6 +247,10 @@ class STEMEnv(gym.Env):
         info = self._get_info()
         if self._terminated or self._truncated:
             gt = self.world.get_ground_truth()
+            # Filter GT to explored region for atom-level tasks
+            if self.task.name != "phase_mapping":
+                from stem_gym.runner import filter_gt_to_explored
+                gt = filter_gt_to_explored(gt, s.visited_mask, self.world)
             info["task_score"] = self.task.score(s.to_findings_dict(), gt)
             reward = info["task_score"]
 

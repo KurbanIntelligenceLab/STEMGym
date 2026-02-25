@@ -1,0 +1,32 @@
+# Targeted task: All agents on SiGe + GaN worlds (20×20, fast episodes)
+# 10 agents × targeted × 4 worlds × 5 seeds = 200 episodes
+
+name: trained_targeted
+
+agents:
+  - random
+  - raster
+  - gp_ucb
+  - gp_ucb_equipped
+  - raster_equipped
+  - stem_agent
+  - no_planner
+  - no_uncertainty
+  - rule_planner
+  - llm_planner
+
+tasks:
+  - targeted
+
+worlds:
+  - sige_gradient_clustered_easy
+  - sige_gradient_clustered_medium
+  - sige_gradient_clustered_hard
+  - gan_easy
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/trained_targeted.json

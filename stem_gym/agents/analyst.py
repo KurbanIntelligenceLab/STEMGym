@@ -113,17 +113,20 @@ class Analyst:
 
         defect_classifier = None
         if (cp / "defect_classifier.pt").exists():
-            defect_classifier = DefectClassifierCNN()
-            defect_classifier.load_state_dict(
-                torch.load(cp / "defect_classifier.pt", map_location=device, weights_only=True)
-            )
+            sd = torch.load(cp / "defect_classifier.pt", map_location=device, weights_only=True)
+            # Infer n_classes from classifier output dimension
+            fc_key = "classifier.4.weight"
+            n_classes = sd[fc_key].shape[0] if fc_key in sd else 4
+            defect_classifier = DefectClassifierCNN(n_classes=n_classes)
+            defect_classifier.load_state_dict(sd)
 
         phase_identifier = None
         if (cp / "phase_identifier.pt").exists():
-            phase_identifier = PhaseIdentifierResNet()
-            phase_identifier.load_state_dict(
-                torch.load(cp / "phase_identifier.pt", map_location=device, weights_only=True)
-            )
+            sd = torch.load(cp / "phase_identifier.pt", map_location=device, weights_only=True)
+            # Infer n_phases from fc layer output dimension
+            n_phases = sd["fc.weight"].shape[0] if "fc.weight" in sd else 2
+            phase_identifier = PhaseIdentifierResNet(n_phases=n_phases)
+            phase_identifier.load_state_dict(sd)
 
         return cls(
             atom_finder=atom_finder,

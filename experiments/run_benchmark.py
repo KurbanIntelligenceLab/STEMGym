@@ -91,6 +91,36 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
         "description": "Raster + trained Analyst (fair comparison)",
     },
+    "raster_vlm_claude": {
+        "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
+        "description": "Raster + Claude Haiku 4.5 VLM analyst",
+        "kwargs": {"provider": "claude"},
+    },
+    "raster_vlm_gpt5": {
+        "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
+        "description": "Raster + GPT-5-mini VLM analyst",
+        "kwargs": {"provider": "gpt5"},
+    },
+    "raster_vlm_llama": {
+        "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
+        "description": "Raster + Llama 4 Scout VLM analyst",
+        "kwargs": {"provider": "llama"},
+    },
+    "gp_ucb_vlm_claude": {
+        "class": "stem_gym.baselines.vlm_baselines.GPUCBVLMAgent",
+        "description": "GP-UCB + Claude Haiku 4.5 VLM analyst",
+        "kwargs": {"provider": "claude"},
+    },
+    "gp_ucb_vlm_gpt5": {
+        "class": "stem_gym.baselines.vlm_baselines.GPUCBVLMAgent",
+        "description": "GP-UCB + GPT-5-mini VLM analyst",
+        "kwargs": {"provider": "gpt5"},
+    },
+    "gp_ucb_vlm_llama": {
+        "class": "stem_gym.baselines.vlm_baselines.GPUCBVLMAgent",
+        "description": "GP-UCB + Llama 4 Scout VLM analyst",
+        "kwargs": {"provider": "llama"},
+    },
 }
 
 TASK_REGISTRY: dict[str, dict[str, Any]] = {
@@ -241,6 +271,8 @@ def _serialize_result(bench: BenchmarkResult, task_name: str, world_name: str) -
                 "tiles_acquired": r.tiles_acquired,
                 "total_dose_used": round(r.total_dose_used, 1),
                 "total_steps": r.total_steps,
+                "dec_dose_fractions": r.dec.dose_fractions.tolist(),
+                "dec_scores": r.dec.scores.tolist(),
             }
             for i, r in enumerate(bench.episode_results)
         ],

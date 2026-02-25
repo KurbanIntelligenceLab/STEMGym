@@ -1,0 +1,26 @@
+# Pareto Sweep: Do agent rankings change with dose budget?
+# 4 representative agents × defect_census × 3 BaTiO3 difficulties × 3 budgets × 5 seeds
+# Run separately for each budget level (override --budget on CLI)
+
+name: pareto_sweep
+
+agents:
+  - raster
+  - gp_ucb_equipped
+  - stem_agent
+  - raster_equipped
+
+tasks:
+  - defect_census
+
+worlds:
+  - batio3_interface_easy
+  - batio3_interface_medium
+  - batio3_interface_hard
+
+seeds: 5
+budget: 3000.0  # Override with --budget 1000, 3000, 10000
+max_steps: 300
+score_every_n_acquires: 5
+
+output: results/pareto_sweep.json
