@@ -98,12 +98,14 @@ echo "=== GPU check ==="
 python3 -c "
 import torch
 if torch.cuda.is_available():
+    props = torch.cuda.get_device_properties(0)
+    vram = getattr(props, 'total_memory', getattr(props, 'total_mem', 0)) / 1e9
     print(f'  GPU: {torch.cuda.get_device_name(0)}')
-    print(f'  VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB')
+    print(f'  VRAM: {vram:.1f} GB')
     print(f'  CUDA: {torch.version.cuda}')
 else:
     print('  WARNING: No GPU detected. Experiments will run on CPU (slow).')
-"
+" || true
 
 mkdir -p results
 
