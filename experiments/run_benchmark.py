@@ -121,6 +121,16 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "GP-UCB + Llama 4 Scout VLM analyst",
         "kwargs": {"provider": "llama"},
     },
+    "raster_vlm_gemini": {
+        "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
+        "description": "Raster + Gemini 2.0 Flash VLM analyst",
+        "kwargs": {"provider": "gemini_flash"},
+    },
+    "gp_ucb_vlm_gemini": {
+        "class": "stem_gym.baselines.vlm_baselines.GPUCBVLMAgent",
+        "description": "GP-UCB + Gemini 2.0 Flash VLM analyst",
+        "kwargs": {"provider": "gemini_flash"},
+    },
 }
 
 TASK_REGISTRY: dict[str, dict[str, Any]] = {

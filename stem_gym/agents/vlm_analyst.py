@@ -34,6 +34,7 @@ PROVIDER_MODELS = {
     "claude": "anthropic/claude-haiku-4.5",
     "gpt5": "openai/gpt-5-mini",
     "llama": "meta-llama/llama-4-scout",
+    "gemini_flash": "google/gemini-2.0-flash-001",
 }
 
 # System prompt for VLM tile analysis

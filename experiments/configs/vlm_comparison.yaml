@@ -10,11 +10,13 @@ agents:
   - raster_vlm_claude
   - raster_vlm_gpt5
   - raster_vlm_llama
+  - raster_vlm_gemini
   - gp_ucb
   - gp_ucb_equipped
   - gp_ucb_vlm_claude
   - gp_ucb_vlm_gpt5
   - gp_ucb_vlm_llama
+  - gp_ucb_vlm_gemini
 
 tasks:
   - defect_census

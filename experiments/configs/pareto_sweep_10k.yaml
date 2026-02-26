@@ -1,0 +1,25 @@
+# Pareto Sweep: budget=10000 e-/A^2
+# 4 agents × defect_census × 3 BaTiO3 difficulties × 5 seeds = 60 episodes
+
+name: pareto_sweep_10k
+
+agents:
+  - raster
+  - gp_ucb_equipped
+  - stem_agent
+  - raster_equipped
+
+tasks:
+  - defect_census
+
+worlds:
+  - batio3_interface_easy
+  - batio3_interface_medium
+  - batio3_interface_hard
+
+seeds: 5
+budget: 10000.0
+max_steps: 800
+score_every_n_acquires: 5
+
+output: results/pareto_sweep_10k.json

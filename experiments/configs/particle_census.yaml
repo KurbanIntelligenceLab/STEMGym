@@ -1,0 +1,30 @@
+# Particle Census: Pt nanoparticle detection, sizing, and morphology
+# 9 agents × 1 task × 3 Pt worlds × 5 seeds = 135 episodes
+
+name: particle_census
+
+agents:
+  - random
+  - raster
+  - gp_ucb
+  - gp_ucb_equipped
+  - raster_equipped
+  - stem_agent
+  - no_planner
+  - no_uncertainty
+  - rule_planner
+
+tasks:
+  - particle_census
+
+worlds:
+  - pt_nanoparticles_easy
+  - pt_nanoparticles_medium
+  - pt_nanoparticles_hard
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/particle_census.json
