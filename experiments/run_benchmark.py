@@ -227,6 +227,7 @@ class ExperimentConfig:
     max_steps: int = 200
     score_every_n_acquires: int = 5
     output: str | None = None
+    workers: int = 1
 
 
 def load_config(path: str) -> ExperimentConfig:
@@ -244,6 +245,7 @@ def load_config(path: str) -> ExperimentConfig:
         max_steps=data.get("max_steps", 200),
         score_every_n_acquires=data.get("score_every_n_acquires", 5),
         output=data.get("output"),
+        workers=data.get("workers", 1),
     )
 
 
@@ -283,8 +285,18 @@ def _serialize_result(bench: BenchmarkResult, task_name: str, world_name: str) -
 # Main benchmark runner
 # ---------------------------------------------------------------------------
 
-def run_full_benchmark(config: ExperimentConfig, verbose: bool = True) -> list[dict]:
+def run_full_benchmark(
+    config: ExperimentConfig,
+    verbose: bool = True,
+    shard: tuple[int, int] | None = None,
+) -> list[dict]:
     """Run the full benchmark matrix specified by config.
+
+    Args:
+        config: Experiment configuration.
+        verbose: Print progress.
+        shard: Optional (shard_index, total_shards) for distributed runs.
+            shard_index is 1-based. Only runs the slice of combos for this shard.
 
     Returns list of serialized result dicts.
     """
@@ -292,7 +304,23 @@ def run_full_benchmark(config: ExperimentConfig, verbose: bool = True) -> list[d
     tasks = config.tasks or list(TASK_REGISTRY.keys())
     worlds = config.worlds or list(WORLD_REGISTRY.keys())
 
-    total_runs = len(agents) * len(tasks) * len(worlds)
+    # Build full job list: (world_name, task_name, agent_name)
+    combos = [
+        (world_name, task_name, agent_name)
+        for world_name in worlds
+        for task_name in tasks
+        for agent_name in agents
+    ]
+
+    # Apply sharding
+    if shard is not None:
+        shard_idx, total_shards = shard
+        combos = [c for i, c in enumerate(combos) if i % total_shards == shard_idx - 1]
+
+    total_runs = len(combos)
+    total_episodes = total_runs * config.seeds
+    workers = config.workers
+
     if verbose:
         print(f"\n{'='*70}")
         print(f"  STEMGym Benchmark: {config.name}")
@@ -302,54 +330,174 @@ def run_full_benchmark(config: ExperimentConfig, verbose: bool = True) -> list[d
         print(f"  Worlds: {worlds}")
         print(f"  Seeds:  {config.seeds}")
         print(f"  Budget: {config.budget}")
-        print(f"  Total combinations: {total_runs}")
+        print(f"  Workers: {workers}")
+        if shard:
+            print(f"  Shard:  {shard[0]}/{shard[1]}")
+        print(f"  Total combinations: {total_runs} ({total_episodes} episodes)")
         print(f"{'='*70}\n")
 
+    # --- Parallel execution ---
+    if workers > 1:
+        return _run_full_benchmark_parallel(config, combos, verbose=verbose)
+
+    # --- Sequential execution (original path) ---
     all_results = []
-    run_idx = 0
+    for run_idx, (world_name, task_name, agent_name) in enumerate(combos, 1):
+        label = f"[{run_idx}/{total_runs}] {agent_name} / {task_name} / {world_name}"
 
-    for world_name in worlds:
+        if verbose:
+            print(f"\n  {label}")
+            print(f"  {'-'*len(label)}")
+
+        t0 = time.time()
         world_path = resolve_world(world_name)
+        task = make_task(task_name)
+        env = STEMEnv(
+            world_path,
+            task=task,
+            total_budget=config.budget,
+            max_steps=config.max_steps,
+        )
 
-        for task_name in tasks:
-            task = make_task(task_name)
+        agent = make_agent(agent_name)
+        bench = run_benchmark(
+            env, agent, agent_name,
+            n_seeds=config.seeds,
+            score_every_n_acquires=config.score_every_n_acquires,
+            verbose=verbose,
+        )
+        env.close()
+        elapsed = time.time() - t0
 
-            for agent_name in agents:
-                run_idx += 1
-                label = f"[{run_idx}/{total_runs}] {agent_name} / {task_name} / {world_name}"
+        result = _serialize_result(bench, task_name, world_name)
+        result["elapsed_seconds"] = round(elapsed, 2)
+        all_results.append(result)
 
-                if verbose:
-                    print(f"\n  {label}")
-                    print(f"  {'-'*len(label)}")
+        if verbose:
+            print(
+                f"  => DEC-AUC: {bench.mean_dec_auc:.4f} +/- {bench.std_dec_auc:.4f}"
+                f"  | tiles: {bench.mean_tiles:.1f}"
+                f"  | time: {elapsed:.1f}s"
+            )
 
-                t0 = time.time()
-                env = STEMEnv(
-                    world_path,
-                    task=task,
-                    total_budget=config.budget,
-                    max_steps=config.max_steps,
-                )
+    return all_results
 
-                agent = make_agent(agent_name)
-                bench = run_benchmark(
-                    env, agent, agent_name,
-                    n_seeds=config.seeds,
-                    score_every_n_acquires=config.score_every_n_acquires,
-                    verbose=verbose,
-                )
-                env.close()
-                elapsed = time.time() - t0
 
-                result = _serialize_result(bench, task_name, world_name)
-                result["elapsed_seconds"] = round(elapsed, 2)
-                all_results.append(result)
+def _run_full_benchmark_parallel(
+    config: ExperimentConfig,
+    combos: list[tuple[str, str, str]],
+    verbose: bool = True,
+) -> list[dict]:
+    """Run benchmark with parallel episode execution via ProcessPoolExecutor."""
+    import multiprocessing as mp
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
+    from stem_gym.runner import _run_episode_isolated
+
+    # Use 'spawn' for CUDA safety
+    ctx = mp.get_context("spawn")
+
+    # Flatten all jobs: (agent, task, world, seed)
+    jobs = []
+    for world_name, task_name, agent_name in combos:
+        world_path = resolve_world(world_name)
+        for seed in range(config.seeds):
+            jobs.append({
+                "agent_name": agent_name,
+                "task_name": task_name,
+                "world_path": world_path,
+                "world_name": world_name,
+                "seed": seed,
+                "budget": config.budget,
+                "max_steps": config.max_steps,
+                "score_every_n_acquires": config.score_every_n_acquires,
+            })
+
+    total_jobs = len(jobs)
+    if verbose:
+        print(f"  Dispatching {total_jobs} episodes across {config.workers} workers...\n")
+
+    t0 = time.time()
+
+    # Collect results keyed by (agent, task, world)
+    results_by_combo: dict[tuple[str, str, str], list[dict]] = {}
+    completed = 0
+
+    with ProcessPoolExecutor(
+        max_workers=config.workers,
+        mp_context=ctx,
+    ) as executor:
+        # Submit all jobs
+        future_to_job = {}
+        for job in jobs:
+            future = executor.submit(_run_episode_isolated, job)
+            future_to_job[future] = job
+
+        # Collect as completed
+        for future in as_completed(future_to_job):
+            job = future_to_job[future]
+            completed += 1
+            key = (job["agent_name"], job["task_name"], job["world_name"])
+
+            try:
+                episode_result = future.result()
+                results_by_combo.setdefault(key, []).append(episode_result)
                 if verbose:
                     print(
-                        f"  => DEC-AUC: {bench.mean_dec_auc:.4f} +/- {bench.std_dec_auc:.4f}"
-                        f"  | tiles: {bench.mean_tiles:.1f}"
-                        f"  | time: {elapsed:.1f}s"
+                        f"  [{completed}/{total_jobs}] "
+                        f"{key[0]}/{key[1]}/{key[2]} seed={job['seed']} "
+                        f"DEC-AUC={episode_result['dec_auc']:.4f}"
                     )
+            except Exception as e:
+                if verbose:
+                    print(
+                        f"  [{completed}/{total_jobs}] "
+                        f"{key[0]}/{key[1]}/{key[2]} seed={job['seed']} "
+                        f"FAILED: {e}"
+                    )
+
+    elapsed = time.time() - t0
+    if verbose:
+        print(f"\n  Total parallel time: {elapsed:.1f}s")
+
+    # Aggregate into same format as sequential
+    all_results = []
+    for world_name, task_name, agent_name in combos:
+        key = (agent_name, task_name, world_name)
+        episodes = results_by_combo.get(key, [])
+        if not episodes:
+            continue
+
+        # Sort by seed for consistent ordering
+        episodes.sort(key=lambda e: e["seed"])
+
+        aucs = [e["dec_auc"] for e in episodes]
+        result = {
+            "agent": agent_name,
+            "task": task_name,
+            "world": world_name,
+            "n_episodes": len(episodes),
+            "mean_dec_auc": round(float(np.mean(aucs)), 6),
+            "std_dec_auc": round(float(np.std(aucs)), 6),
+            "mean_final_score": round(float(np.mean([e["final_score"] for e in episodes])), 6),
+            "mean_dose_used": round(float(np.mean([e["total_dose_used"] for e in episodes])), 1),
+            "mean_tiles": round(float(np.mean([e["tiles_acquired"] for e in episodes])), 1),
+            "episodes": [
+                {
+                    "seed": e["seed"],
+                    "dec_auc": round(e["dec_auc"], 6),
+                    "final_score": round(e["final_score"], 6),
+                    "tiles_acquired": e["tiles_acquired"],
+                    "total_dose_used": round(e["total_dose_used"], 1),
+                    "total_steps": e["total_steps"],
+                    "dec_dose_fractions": e["dec_dose_fractions"],
+                    "dec_scores": e["dec_scores"],
+                }
+                for e in episodes
+            ],
+            "elapsed_seconds": round(elapsed, 2),
+        }
+        all_results.append(result)
 
     return all_results
 
@@ -421,6 +569,19 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--output", "-o", type=str, default=None, help="Output JSON file path")
     run_parser.add_argument("--quiet", "-q", action="store_true", help="Suppress verbose output")
     run_parser.add_argument("--dry-run", action="store_true", help="Print plan without executing")
+    run_parser.add_argument(
+        "--workers", "-j", type=int, default=1,
+        help="Number of parallel workers (1=sequential, >1=parallel episodes)",
+    )
+    run_parser.add_argument(
+        "--shard", type=str, default=None,
+        help="Shard spec 'K/N' — run shard K of N total (1-based). For distributed runs.",
+    )
+
+    # -- merge command --
+    merge_parser = sub.add_parser("merge", help="Merge shard result JSON files")
+    merge_parser.add_argument("inputs", nargs="+", help="Input JSON files to merge")
+    merge_parser.add_argument("--output", "-o", required=True, help="Output merged JSON file")
 
     # -- list command --
     list_parser = sub.add_parser("list", help="List available agents, tasks, worlds")
@@ -472,6 +633,8 @@ def cmd_run(args):
             config.budget = args.budget
         if args.output:
             config.output = args.output
+        if args.workers != 1:
+            config.workers = args.workers
     else:
         config = ExperimentConfig(
             agents=args.agent,
@@ -482,6 +645,7 @@ def cmd_run(args):
             max_steps=args.max_steps,
             score_every_n_acquires=args.score_every,
             output=args.output,
+            workers=args.workers,
         )
 
     # Validate
@@ -495,6 +659,18 @@ def cmd_run(args):
     if not config.agents:
         config.agents = list(AGENT_REGISTRY.keys())
 
+    # Parse shard
+    shard = None
+    if args.shard:
+        parts = args.shard.split("/")
+        if len(parts) != 2:
+            print("Error: --shard must be 'K/N' (e.g. '1/4')")
+            sys.exit(1)
+        shard = (int(parts[0]), int(parts[1]))
+        if shard[0] < 1 or shard[0] > shard[1]:
+            print(f"Error: shard index must be 1..{shard[1]}, got {shard[0]}")
+            sys.exit(1)
+
     # Dry run
     if args.dry_run:
         total = len(config.agents) * len(config.tasks) * len(config.worlds) * config.seeds
@@ -504,12 +680,15 @@ def cmd_run(args):
         print(f"    Worlds: {config.worlds}")
         print(f"    Seeds:  {config.seeds}")
         print(f"    Budget: {config.budget}")
+        print(f"    Workers: {config.workers}")
+        if shard:
+            print(f"    Shard:  {shard[0]}/{shard[1]}")
         print(f"    Total episodes: {total}")
         return
 
     # Run
     verbose = not args.quiet
-    results = run_full_benchmark(config, verbose=verbose)
+    results = run_full_benchmark(config, verbose=verbose, shard=shard)
 
     # Print summary
     print(f"\n{'='*70}")
@@ -532,10 +711,41 @@ def cmd_run(args):
                     "seeds": config.seeds,
                     "budget": config.budget,
                     "max_steps": config.max_steps,
+                    "workers": config.workers,
                 },
                 "results": results,
             }, f, indent=2)
         print(f"\n  Results saved to: {output_path}")
+
+
+def cmd_merge(args):
+    """Merge multiple shard result files into one."""
+    all_results = []
+    merged_config = None
+
+    for input_path in args.inputs:
+        with open(input_path) as f:
+            data = json.load(f)
+        if merged_config is None:
+            merged_config = data.get("config", {})
+        all_results.extend(data.get("results", []))
+
+    # Deduplicate: if same (agent, task, world) appears in multiple shards, keep all
+    # (they should be disjoint if sharded properly)
+    if not all_results:
+        print("  No results found in input files.")
+        return
+
+    out = Path(args.output)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w") as f:
+        json.dump({
+            "config": merged_config or {},
+            "results": all_results,
+        }, f, indent=2)
+
+    print(f"  Merged {len(all_results)} result entries from {len(args.inputs)} files")
+    print(f"  Output: {args.output}")
 
 
 def main():
@@ -549,6 +759,8 @@ def main():
         cmd_list(args.what)
     elif args.command == "run":
         cmd_run(args)
+    elif args.command == "merge":
+        cmd_merge(args)
 
 
 if __name__ == "__main__":

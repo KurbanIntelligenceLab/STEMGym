@@ -38,6 +38,9 @@ class World:
         self.path = Path(path)
         self._file: h5py.File | None = None
         self._metadata: dict[str, Any] = {}
+        self._ground_truth_cache: dict[str, Any] | None = None
+        self._overview_cache: np.ndarray | None = None
+        self._valid_region_cache: np.ndarray | None = None
         self._open()
 
     def _open(self) -> None:
@@ -124,8 +127,10 @@ class World:
         return np.array(self._file[key], dtype=np.float32)
 
     def get_overview(self) -> np.ndarray:
-        """Load the low-resolution overview image."""
-        return np.array(self._file["overview"], dtype=np.float32)
+        """Load the low-resolution overview image (cached after first call)."""
+        if self._overview_cache is None:
+            self._overview_cache = np.array(self._file["overview"], dtype=np.float32)
+        return self._overview_cache
 
     def get_overview_at(self, x_nm: float, y_nm: float, size_px: int = 64) -> np.ndarray:
         """Extract a crop from the overview centered at (x_nm, y_nm).
@@ -157,29 +162,42 @@ class World:
         return out
 
     def get_ground_truth(self) -> dict[str, Any]:
-        """Load all ground truth data."""
+        """Load all ground truth data (cached after first call)."""
+        if self._ground_truth_cache is not None:
+            return self._ground_truth_cache
+
         gt = {}
         gt_group = self._file["ground_truth"]
         for key in gt_group:
             data = gt_group[key]
             if isinstance(data, h5py.Dataset):
                 arr = np.array(data)
-                # Decode bytes to strings for string arrays
-                if arr.dtype.kind == "S" or arr.dtype.kind == "O":
-                    arr = np.array([x.decode() if isinstance(x, bytes) else x for x in arr])
+                # Decode bytes to strings for string arrays (vectorized)
+                if arr.dtype.kind == "S":
+                    arr = arr.astype(str)
+                elif arr.dtype.kind == "O":
+                    # Object arrays with mixed bytes/str
+                    try:
+                        arr = np.char.decode(arr.astype(bytes), "utf-8")
+                    except (UnicodeDecodeError, TypeError):
+                        arr = np.array([x.decode() if isinstance(x, bytes) else x for x in arr])
                 gt[key] = arr
         # Also load attributes
         for key, val in gt_group.attrs.items():
             gt[key] = val
+
+        self._ground_truth_cache = gt
         return gt
 
     def get_valid_region(self) -> np.ndarray:
-        """Load the valid region mask. Returns (H, W) bool array."""
-        if "valid_region" in self._file:
-            return np.array(self._file["valid_region"], dtype=bool)
-        # Default: everything is valid
-        h, w = self.world_shape_px
-        return np.ones((h, w), dtype=bool)
+        """Load the valid region mask (cached after first call). Returns (H, W) bool array."""
+        if self._valid_region_cache is None:
+            if "valid_region" in self._file:
+                self._valid_region_cache = np.array(self._file["valid_region"], dtype=bool)
+            else:
+                h, w = self.world_shape_px
+                self._valid_region_cache = np.ones((h, w), dtype=bool)
+        return self._valid_region_cache
 
     def get_tile_valid_mask(self, row: int, col: int) -> np.ndarray:
         """Get the valid_region crop for a specific tile.
@@ -205,11 +223,16 @@ class World:
         inner_x0 = half_ovlp if col > 0 else 0
         inner_x1 = ts - half_ovlp if col < self.grid_shape[1] - 1 else ts
 
-        for ty in range(inner_y0, inner_y1):
-            for tx in range(inner_x0, inner_x1):
-                gy, gx = y0 + ty, x0 + tx
-                if 0 <= gy < h and 0 <= gx < w:
-                    tile_mask[ty, tx] = full_mask[gy, gx]
+        # Clip global coords to valid region bounds
+        gy0 = y0 + inner_y0
+        gy1 = min(y0 + inner_y1, h)
+        gx0 = x0 + inner_x0
+        gx1 = min(x0 + inner_x1, w)
+
+        if gy1 > gy0 and gx1 > gx0:
+            tile_mask[inner_y0:inner_y0 + (gy1 - gy0), inner_x0:inner_x0 + (gx1 - gx0)] = (
+                full_mask[gy0:gy1, gx0:gx1]
+            )
 
         return tile_mask
 

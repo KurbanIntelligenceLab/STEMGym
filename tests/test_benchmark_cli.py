@@ -44,11 +44,13 @@ class TestRegistries:
             "stem_agent", "no_planner", "no_uncertainty",
             "llm_planner", "rule_planner",
             "gp_ucb_equipped", "raster_equipped",
+            "raster_vlm_claude", "raster_vlm_gpt5", "raster_vlm_llama",
+            "gp_ucb_vlm_claude", "gp_ucb_vlm_gpt5", "gp_ucb_vlm_llama",
         }
         assert expected == set(AGENT_REGISTRY.keys())
 
     def test_task_registry_has_all_tasks(self):
-        expected = {"defect_census", "phase_mapping", "targeted"}
+        expected = {"defect_census", "phase_mapping", "targeted", "particle_census"}
         assert expected == set(TASK_REGISTRY.keys())
 
     def test_world_registry_discovers_files(self):

@@ -227,3 +227,50 @@ def run_benchmark(
         mean_dose_used=float(np.mean([r.total_dose_used for r in results])),
         mean_tiles=float(np.mean([r.tiles_acquired for r in results])),
     )
+
+
+def _run_episode_isolated(job: dict[str, Any]) -> dict[str, Any]:
+    """Run a single episode in an isolated process.
+
+    Accepts a plain dict (picklable) and returns a plain dict.
+    Designed for use with ProcessPoolExecutor.
+
+    Args:
+        job: dict with keys: agent_name, task_name, world_path, seed,
+             budget, max_steps, score_every_n_acquires.
+
+    Returns:
+        dict with episode result data (JSON-serializable).
+    """
+    # Late imports so each worker process initializes independently
+    from stem_gym.envs.stem_env import STEMEnv  # noqa: F811
+
+    # Import make_agent/make_task from experiments module
+    import importlib
+    run_bench = importlib.import_module("experiments.run_benchmark")
+
+    agent_name = job["agent_name"]
+    task_name = job["task_name"]
+    world_path = job["world_path"]
+    seed = job["seed"]
+    budget = job["budget"]
+    max_steps = job["max_steps"]
+    score_every = job["score_every_n_acquires"]
+
+    task = run_bench.make_task(task_name)
+    env = STEMEnv(world_path, task=task, total_budget=budget, max_steps=max_steps)
+    agent = run_bench.make_agent(agent_name, seed=seed)
+
+    result = run_episode(env, agent, seed=seed, score_every_n_acquires=score_every)
+    env.close()
+
+    return {
+        "seed": seed,
+        "dec_auc": result.dec.auc,
+        "final_score": result.final_score,
+        "tiles_acquired": result.tiles_acquired,
+        "total_dose_used": result.total_dose_used,
+        "total_steps": result.total_steps,
+        "dec_dose_fractions": result.dec.dose_fractions.tolist(),
+        "dec_scores": result.dec.scores.tolist(),
+    }

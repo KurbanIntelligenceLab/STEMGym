@@ -75,8 +75,9 @@ class GPUCBAgent(Agent):
         from botorch.fit import fit_gpytorch_mll
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        train_X = torch.tensor(self._X, dtype=torch.float64)
-        train_Y = torch.tensor(self._Y, dtype=torch.float64).unsqueeze(-1)
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
+        train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 
         # Normalize Y
         y_mean = train_Y.mean()
@@ -88,7 +89,7 @@ class GPUCBAgent(Agent):
             mll = ExactMarginalLogLikelihood(
                 self._gp_model.likelihood, self._gp_model
             )
-            fit_gpytorch_mll(mll)
+            fit_gpytorch_mll(mll, optimizer_kwargs={"options": {"maxiter": 50}})
         except Exception:
             # Fall back to unfitted model if optimization fails
             self._gp_model = SingleTaskGP(train_X, train_Y_norm)
@@ -120,10 +121,12 @@ class GPUCBAgent(Agent):
             c = self.rng.integers(0, grid_w)
             return self._grid_to_nm(r, c)
 
-        # Normalize candidate positions to [0, 1]
+        # Normalize candidate positions to [0, 1] on same device as GP
+        _device = next(self._gp_model.parameters()).device
         cand_norm = torch.tensor(
             [[r / max(grid_h - 1, 1), c / max(grid_w - 1, 1)] for r, c in candidates],
             dtype=torch.float64,
+            device=_device,
         )
 
         # Compute posterior

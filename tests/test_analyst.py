@@ -182,11 +182,11 @@ class TestTraining:
         assert len(dataset) > 0, "No tiles loaded from test world"
 
         # Train with small models for speed
-        atom_finder = train_atom_finder(
+        atom_finder, _ = train_atom_finder(
             dataset, n_members=2, epochs=15, batch_size=4,
             lr=1e-3, device="cpu",
         )
-        defect_clf = train_defect_classifier(
+        defect_clf, _ = train_defect_classifier(
             dataset, epochs=15, batch_size=16,
             lr=1e-3, device="cpu",
         )

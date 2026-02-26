@@ -24,6 +24,11 @@ from stem_gym.agents.simple_analyst import AnalysisResult
 DEFECT_CLASSES = ["pristine", "vacancy", "substitution", "interstitial"]
 
 
+def _default_device() -> str:
+    """Return 'cuda' if available, else 'cpu'."""
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
 class Analyst:
     """Neural network analyst ensemble.
 
@@ -41,13 +46,13 @@ class Analyst:
         atom_finder: AtomFinderEnsemble | None = None,
         defect_classifier: DefectClassifierCNN | None = None,
         phase_identifier: PhaseIdentifierResNet | None = None,
-        device: str = "cpu",
+        device: str | None = None,
         peak_threshold: float = 0.15,
         peak_min_distance: int = 5,
         defect_patch_size: int = 32,
         phase_patch_size: int = 64,
     ):
-        self.device = torch.device(device)
+        self.device = torch.device(device if device is not None else _default_device())
         self.peak_threshold = peak_threshold
         self.peak_min_distance = peak_min_distance
         self.defect_patch_size = defect_patch_size
@@ -92,7 +97,7 @@ class Analyst:
         self._phase_tile_keys.clear()
 
     @classmethod
-    def from_checkpoint(cls, checkpoint_dir: str | Path, device: str = "cpu") -> "Analyst":
+    def from_checkpoint(cls, checkpoint_dir: str | Path, device: str | None = None) -> "Analyst":
         """Load trained models from a checkpoint directory.
 
         Expected files:
@@ -100,6 +105,8 @@ class Analyst:
             defect_classifier.pt — DefectClassifierCNN state dict
             phase_identifier.pt — PhaseIdentifierResNet state dict
         """
+        if device is None:
+            device = _default_device()
         cp = Path(checkpoint_dir)
 
         atom_finder = None
@@ -110,6 +117,10 @@ class Analyst:
             n_members = max(member_ids) + 1 if member_ids else 3
             atom_finder = AtomFinderEnsemble(n_members=n_members)
             atom_finder.load_state_dict(sd)
+            try:
+                atom_finder = torch.compile(atom_finder)
+            except Exception:
+                pass
 
         defect_classifier = None
         if (cp / "defect_classifier.pt").exists():
@@ -119,6 +130,10 @@ class Analyst:
             n_classes = sd[fc_key].shape[0] if fc_key in sd else 4
             defect_classifier = DefectClassifierCNN(n_classes=n_classes)
             defect_classifier.load_state_dict(sd)
+            try:
+                defect_classifier = torch.compile(defect_classifier)
+            except Exception:
+                pass
 
         phase_identifier = None
         if (cp / "phase_identifier.pt").exists():
@@ -127,6 +142,10 @@ class Analyst:
             n_phases = sd["fc.weight"].shape[0] if "fc.weight" in sd else 2
             phase_identifier = PhaseIdentifierResNet(n_phases=n_phases)
             phase_identifier.load_state_dict(sd)
+            try:
+                phase_identifier = torch.compile(phase_identifier)
+            except Exception:
+                pass
 
         return cls(
             atom_finder=atom_finder,
@@ -189,7 +208,7 @@ class Analyst:
             return coords.astype(np.float32), confs, np.zeros_like(tile)
 
         x = self._tile_to_tensor(tile)
-        with torch.no_grad():
+        with torch.inference_mode():
             prob_map, unc_map = self.atom_finder(x)
 
         prob = prob_map[0, 0].cpu().numpy()
@@ -262,7 +281,7 @@ class Analyst:
         b_max = batch.amax(dim=(2, 3), keepdim=True)
         batch = (batch - b_min) / (b_max - b_min + 1e-6)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             logits = self.defect_classifier(batch)
             probs = F.softmax(logits, dim=-1)
 
@@ -337,7 +356,7 @@ class Analyst:
         if x_max > x_min:
             x = (x - x_min) / (x_max - x_min)
 
-        with torch.no_grad():
+        with torch.inference_mode():
             logits = self.phase_identifier(x)
             probs = F.softmax(logits, dim=-1)
 
