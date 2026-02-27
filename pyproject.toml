@@ -35,6 +35,9 @@ replay = [
 human = [
     "gradio>=4.0",
 ]
+rl = [
+    "stable-baselines3>=2.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

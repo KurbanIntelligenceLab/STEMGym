@@ -231,6 +231,15 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "STEMAgent without DECLARE (explicit baseline)",
         "kwargs": {"use_declare": False},
     },
+    # -- DQN RL baselines --
+    "dqn": {
+        "class": "stem_gym.baselines.rl_agent.DQNAgent",
+        "description": "DQN RL navigation baseline (SB3)",
+    },
+    "dqn_equipped": {
+        "class": "stem_gym.baselines.rl_agent.DQNEquippedAgent",
+        "description": "DQN navigation + trained Analyst",
+    },
 }
 
 TASK_REGISTRY: dict[str, dict[str, Any]] = {
