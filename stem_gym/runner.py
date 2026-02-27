@@ -137,6 +137,10 @@ def run_episode(
                 gt = filter_gt_to_explored(gt, env.state.visited_mask, env.world)
             score = env.task.score(findings, gt)
             log_entry["task_score"] = score
+            # Log composite sub-scores if available
+            if hasattr(env.task, "_last_scores"):
+                log_entry["task_score_a"] = env.task._last_scores[0]
+                log_entry["task_score_b"] = env.task._last_scores[1]
             acquires_since_score = 0
 
         # Final scoring at episode end
@@ -148,6 +152,10 @@ def run_episode(
                 gt = filter_gt_to_explored(gt, env.state.visited_mask, env.world)
             score = env.task.score(findings, gt)
             log_entry["task_score"] = score
+            # Log composite sub-scores if available
+            if hasattr(env.task, "_last_scores"):
+                log_entry["task_score_a"] = env.task._last_scores[0]
+                log_entry["task_score_b"] = env.task._last_scores[1]
             episode_log.append(log_entry)
             break
 

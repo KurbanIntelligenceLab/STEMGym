@@ -32,6 +32,9 @@ sim = [
 replay = [
     "py4dstem>=0.14",
 ]
+human = [
+    "gradio>=4.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

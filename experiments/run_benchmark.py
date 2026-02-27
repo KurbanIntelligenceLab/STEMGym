@@ -211,6 +211,15 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "Full STEMAgent with Thompson Sampling",
         "kwargs": {"acq_func": "ts"},
     },
+    # -- Adaptive (online fine-tuning) variants --
+    "adaptive_raster": {
+        "class": "stem_gym.agents.adaptive_agent.AdaptiveRasterAgent",
+        "description": "Raster + AdaptiveAnalyst (online fine-tuning)",
+    },
+    "adaptive_stem": {
+        "class": "stem_gym.agents.adaptive_agent.AdaptiveSTEMAgent",
+        "description": "STEMAgent + AdaptiveAnalyst (online fine-tuning)",
+    },
     # -- DECLARE variants --
     "stem_agent_declare": {
         "class": "stem_gym.agents.multi_agent.STEMAgent",
@@ -241,6 +250,10 @@ TASK_REGISTRY: dict[str, dict[str, Any]] = {
     "particle_census": {
         "class": "stem_gym.tasks.particle_census.ParticleCensusTask",
         "description": "Detection + sizing + morphology for nanoparticles",
+    },
+    "composite": {
+        "class": "stem_gym.tasks.composite_task.CompositeTask",
+        "description": "Multi-objective: defect census + phase mapping (weighted)",
     },
 }
 

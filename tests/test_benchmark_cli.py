@@ -60,13 +60,15 @@ class TestRegistries:
             "gp_ucb_ei", "gp_ucb_ts",
             "gp_ucb_ei_equipped", "gp_ucb_ts_equipped",
             "stem_agent_ei", "stem_agent_ts",
+            # Adaptive (online fine-tuning) variants
+            "adaptive_raster", "adaptive_stem",
             # DECLARE variants
             "stem_agent_declare", "stem_agent_no_declare",
         }
         assert expected == set(AGENT_REGISTRY.keys())
 
     def test_task_registry_has_all_tasks(self):
-        expected = {"defect_census", "phase_mapping", "targeted", "particle_census"}
+        expected = {"defect_census", "phase_mapping", "targeted", "particle_census", "composite"}
         assert expected == set(TASK_REGISTRY.keys())
 
     def test_world_registry_discovers_files(self):

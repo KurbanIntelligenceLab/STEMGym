@@ -40,8 +40,12 @@ def evaluate_acquisition(
 
     elif acq_func == "ei":
         # Expected Improvement: EI(x) = E[max(f(x) - f*, 0)]
+        # Normalize train_Y defensively — callers may pass raw values while
+        # the GP posterior operates in (manually) normalized space.
         if train_Y is not None:
-            best_f = train_Y.max()
+            y_mean = train_Y.mean()
+            y_std = train_Y.std().clamp(min=1e-6)
+            best_f = ((train_Y - y_mean) / y_std).max()
         else:
             best_f = mean.max()
         z = (mean - best_f) / std.clamp(min=1e-8)

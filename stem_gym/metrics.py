@@ -89,3 +89,78 @@ def compute_dec(
 def dec_auc(episode_log: list[dict], total_budget: float) -> float:
     """Convenience: compute just the DEC-AUC scalar."""
     return compute_dec(episode_log, total_budget).auc
+
+
+@dataclass
+class ParetoHVResult:
+    """Result of Pareto hypervolume computation over two objectives."""
+    dose_fractions: np.ndarray  # (K,) dose fraction checkpoints
+    hv_values: np.ndarray       # (K,) hypervolume at each checkpoint
+    hv_auc: float               # AUC of HV-DEC curve
+    scores_a: np.ndarray        # (K,) interpolated scores for objective A
+    scores_b: np.ndarray        # (K,) interpolated scores for objective B
+
+
+def compute_pareto_hypervolume(
+    episode_log: list[dict],
+    total_budget: float,
+    n_checkpoints: int = 50,
+    ref_point: tuple[float, float] = (0.0, 0.0),
+) -> ParetoHVResult:
+    """Compute 2D Pareto hypervolume DEC from composite task episode log.
+
+    For a single trajectory, the hypervolume at each dose checkpoint is
+    simply ``(score_a - ref_a) * (score_b - ref_b)`` since there is one
+    point on the Pareto front. For multi-trajectory aggregation, compute
+    the dominated hypervolume of the point set.
+
+    Args:
+        episode_log: Episode log entries with ``task_score_a`` and
+            ``task_score_b`` fields (produced by CompositeTask).
+        total_budget: Total dose budget for normalization.
+        n_checkpoints: Number of uniform dose fraction checkpoints.
+        ref_point: Reference point for hypervolume (lower-left).
+
+    Returns:
+        ParetoHVResult with HV values at each checkpoint and HV-DEC-AUC.
+    """
+    scored = []
+    for entry in episode_log:
+        sa = entry.get("task_score_a")
+        sb = entry.get("task_score_b")
+        if sa is not None and sb is not None:
+            dose_frac = entry["dose_used"] / total_budget if total_budget > 0 else 1.0
+            scored.append((dose_frac, sa, sb))
+
+    dose_fracs = np.linspace(0, 1, n_checkpoints)
+
+    if not scored:
+        return ParetoHVResult(
+            dose_fractions=dose_fracs,
+            hv_values=np.zeros(n_checkpoints),
+            hv_auc=0.0,
+            scores_a=np.zeros(n_checkpoints),
+            scores_b=np.zeros(n_checkpoints),
+        )
+
+    scored.sort(key=lambda x: x[0])
+    d = np.array([s[0] for s in scored])
+    a = np.array([s[1] for s in scored])
+    b = np.array([s[2] for s in scored])
+
+    scores_a = np.interp(dose_fracs, d, a, left=0.0, right=a[-1])
+    scores_b = np.interp(dose_fracs, d, b, left=0.0, right=b[-1])
+
+    # Hypervolume: area of rectangle from ref_point to (score_a, score_b)
+    hv = np.maximum(scores_a - ref_point[0], 0.0) * np.maximum(scores_b - ref_point[1], 0.0)
+
+    _trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
+    hv_auc = float(_trapz(hv, dose_fracs))
+
+    return ParetoHVResult(
+        dose_fractions=dose_fracs,
+        hv_values=hv,
+        hv_auc=hv_auc,
+        scores_a=scores_a,
+        scores_b=scores_b,
+    )

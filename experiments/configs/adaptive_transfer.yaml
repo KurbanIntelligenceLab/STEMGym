@@ -1,0 +1,19 @@
+name: adaptive_transfer
+agents:
+  - raster_equipped
+  - adaptive_raster
+  - stem_agent
+  - adaptive_stem
+tasks:
+  - defect_census
+worlds:
+  # Cross-family (models trained on perovskites, tested on non-perovskites)
+  - gan_easy
+  - pt_nanoparticles_easy
+  # In-distribution control
+  - srtio3_clustered_easy
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+output: results/adaptive_transfer.json
