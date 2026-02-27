@@ -1,0 +1,32 @@
+# Zoom/Dwell Ablation: 3×3 grid of zoom∈{1,2,4} × dwell∈{0.5,1,2}
+# 9 agents × defect_census × 5 easy worlds × 5 seeds = 225 episodes
+# CPU only (raster navigation, no BO)
+name: zoom_dwell_ablation
+
+agents:
+  - raster_equipped        # z1 d1 (baseline)
+  - raster_equipped_z2     # z2 d1
+  - raster_equipped_z4     # z4 d1
+  - raster_equipped_d05    # z1 d0.5
+  - raster_equipped_d2     # z1 d2
+  - raster_equipped_z2_d05 # z2 d0.5
+  - raster_equipped_z2_d2  # z2 d2
+  - raster_equipped_z4_d05 # z4 d0.5
+  - raster_equipped_z4_d2  # z4 d2
+
+tasks:
+  - defect_census
+
+worlds:
+  - srtio3_clustered_easy
+  - batio3_interface_easy
+  - sige_gradient_clustered_easy
+  - gan_easy
+  - pt_nanoparticles_easy
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+output: results/zoom_dwell_ablation.json
+workers: 4

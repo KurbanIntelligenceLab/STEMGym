@@ -41,10 +41,12 @@ class Navigator:
         initial_random: int = 4,
         refit_interval: int = 3,
         seed: int = 42,
+        acq_func: str = "ucb",
     ):
         self.beta = beta
         self.initial_random = initial_random
         self.refit_interval = refit_interval
+        self.acq_func = acq_func
         self.rng = np.random.default_rng(seed)
 
         # GP training data
@@ -105,15 +107,14 @@ class Navigator:
             device=_device,
         )
 
-        # Compute GP posterior UCB
-        self._gp_model.eval()
-        with torch.no_grad():
-            posterior = self._gp_model.posterior(cand_norm)
-            mean = posterior.mean.squeeze(-1)
-            std = posterior.variance.sqrt().squeeze(-1)
-
-        ucb = mean + self.beta * std
-        best_idx = ucb.argmax().item()
+        # Compute acquisition function values
+        from stem_gym.agents.acquisition import evaluate_acquisition
+        train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1) if self._Y else None
+        acq_values = evaluate_acquisition(
+            self._gp_model, cand_norm,
+            acq_func=self.acq_func, beta=self.beta, train_Y=train_Y,
+        )
+        best_idx = acq_values.argmax().item()
         row, col = candidates[best_idx]
         return self._grid_to_nm(row, col)
 

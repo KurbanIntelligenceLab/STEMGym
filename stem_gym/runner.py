@@ -117,9 +117,11 @@ def run_episode(
         # Periodic scoring checkpoint
         log_entry = {
             "step": step,
+            "action_type": int(action.get("action_type", -1)),
             "dose_used": env.state.dose_used,
             "tiles_acquired": current_tiles,
             "position": env.state.position,
+            "n_declarations": len(env.state.findings),
             "task_score": None,
         }
 
@@ -264,7 +266,7 @@ def _run_episode_isolated(job: dict[str, Any]) -> dict[str, Any]:
     result = run_episode(env, agent, seed=seed, score_every_n_acquires=score_every)
     env.close()
 
-    return {
+    episode_data = {
         "seed": seed,
         "dec_auc": result.dec.auc,
         "final_score": result.final_score,
@@ -274,3 +276,17 @@ def _run_episode_isolated(job: dict[str, Any]) -> dict[str, Any]:
         "dec_dose_fractions": result.dec.dose_fractions.tolist(),
         "dec_scores": result.dec.scores.tolist(),
     }
+
+    if job.get("save_trajectories"):
+        episode_data["trajectory"] = [
+            {
+                "step": e["step"],
+                "action_type": e.get("action_type", -1),
+                "dose_used": e["dose_used"],
+                "tiles_acquired": e["tiles_acquired"],
+                "position": list(e["position"]) if e.get("position") else None,
+            }
+            for e in result.episode_log
+        ]
+
+    return episode_data

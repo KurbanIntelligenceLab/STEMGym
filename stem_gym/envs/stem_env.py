@@ -183,9 +183,26 @@ class STEMEnv(gym.Env):
             raise RuntimeError("Must call reset() before step()")
 
         s = self.state
-        s.step_count += 1
         reward = 0.0
         action_type = int(action["action_type"])
+
+        # DECLARE is zero-cost: no step count, no dose, just an annotation
+        if action_type == ActionType.DECLARE:
+            finding_type_idx = int(action.get("finding_type", 0))
+            finding_types = [
+                "pristine", "vacancy", "substitution", "interstitial",
+                "phase_boundary", "interface", "target", "other",
+            ]
+            ft = finding_types[min(finding_type_idx, len(finding_types) - 1)]
+            from stem_gym.state import Finding
+            s.findings.append(Finding(
+                finding_type=ft,
+                position=s.position,
+            ))
+            return self._get_obs(), 0.0, self._terminated, self._truncated, self._get_info()
+
+        # All non-DECLARE actions consume a step
+        s.step_count += 1
 
         if action_type == ActionType.NAVIGATE:
             # Move probe — free
@@ -218,20 +235,6 @@ class STEMEnv(gym.Env):
             else:
                 # Not enough budget — no-op
                 pass
-
-        elif action_type == ActionType.DECLARE:
-            # Declare a finding at current position
-            finding_type_idx = int(action.get("finding_type", 0))
-            finding_types = [
-                "pristine", "vacancy", "substitution", "interstitial",
-                "phase_boundary", "interface", "target", "other",
-            ]
-            ft = finding_types[min(finding_type_idx, len(finding_types) - 1)]
-            from stem_gym.state import Finding
-            s.findings.append(Finding(
-                finding_type=ft,
-                position=s.position,
-            ))
 
         elif action_type == ActionType.DONE:
             # Agent declares episode finished

@@ -40,12 +40,28 @@ def world_path():
 class TestRegistries:
     def test_agent_registry_has_all_agents(self):
         expected = {
+            # Core agents
             "random", "raster", "gp_ucb", "single_bo",
             "stem_agent", "no_planner", "no_uncertainty",
             "llm_planner", "rule_planner",
+            # Equipped baselines
             "gp_ucb_equipped", "raster_equipped",
+            "random_equipped", "single_bo_equipped",
+            # VLM baselines
             "raster_vlm_claude", "raster_vlm_gpt5", "raster_vlm_llama",
             "gp_ucb_vlm_claude", "gp_ucb_vlm_gpt5", "gp_ucb_vlm_llama",
+            "raster_vlm_gemini", "gp_ucb_vlm_gemini",
+            # Zoom/dwell ablation variants
+            "raster_equipped_z2", "raster_equipped_z4",
+            "raster_equipped_d05", "raster_equipped_d2",
+            "raster_equipped_z2_d05", "raster_equipped_z2_d2",
+            "raster_equipped_z4_d05", "raster_equipped_z4_d2",
+            # Acquisition function variants
+            "gp_ucb_ei", "gp_ucb_ts",
+            "gp_ucb_ei_equipped", "gp_ucb_ts_equipped",
+            "stem_agent_ei", "stem_agent_ts",
+            # DECLARE variants
+            "stem_agent_declare", "stem_agent_no_declare",
         }
         assert expected == set(AGENT_REGISTRY.keys())
 

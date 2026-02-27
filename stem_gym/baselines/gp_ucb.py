@@ -38,10 +38,12 @@ class GPUCBAgent(Agent):
         beta: float = 2.0,
         seed: int = 42,
         initial_random: int = 4,
+        acq_func: str = "ucb",
     ):
         self.beta = beta
         self.seed = seed
         self.initial_random = initial_random
+        self.acq_func = acq_func
         self.analyst = SimpleAnalyst()
         self.rng = np.random.default_rng(seed)
 
@@ -129,16 +131,14 @@ class GPUCBAgent(Agent):
             device=_device,
         )
 
-        # Compute posterior
-        self._gp_model.eval()
-        with torch.no_grad():
-            posterior = self._gp_model.posterior(cand_norm)
-            mean = posterior.mean.squeeze(-1)
-            std = posterior.variance.sqrt().squeeze(-1)
-
-        # UCB = mean + beta * std
-        ucb = mean + self.beta * std
-        best_idx = ucb.argmax().item()
+        # Compute acquisition function values
+        from stem_gym.agents.acquisition import evaluate_acquisition
+        train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1) if self._Y else None
+        acq_values = evaluate_acquisition(
+            self._gp_model, cand_norm,
+            acq_func=self.acq_func, beta=self.beta, train_Y=train_Y,
+        )
+        best_idx = acq_values.argmax().item()
         row, col = candidates[best_idx]
         return self._grid_to_nm(row, col)
 

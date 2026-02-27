@@ -105,8 +105,8 @@ class GPUCBEquippedAgent(GPUCBAgent):
     for world-coordinate defect localization).
     """
 
-    def __init__(self, beta=2.0, seed=42, initial_random=3, checkpoint_dir=None):
-        super().__init__(beta=beta, seed=seed, initial_random=initial_random)
+    def __init__(self, beta=2.0, seed=42, initial_random=3, checkpoint_dir=None, acq_func="ucb"):
+        super().__init__(beta=beta, seed=seed, initial_random=initial_random, acq_func=acq_func)
         self.analyst = _load_analyst(checkpoint_dir)
         self._pixel_size_nm: float = 0.005
 
@@ -185,8 +185,12 @@ class RasterEquippedAgent(Agent):
         self,
         seed: int = 42,
         checkpoint_dir: str | Path | None = None,
+        zoom: float = 1.0,
+        dwell: float = 1.0,
     ):
         self.analyst = _load_analyst(checkpoint_dir)
+        self._zoom = zoom
+        self._dwell = dwell
         self._grid_shape: tuple[int, int] = (1, 1)
         self._fov_nm: tuple[float, float] = (1.0, 1.0)
         self._pixel_size_nm: float = 0.005
@@ -234,8 +238,8 @@ class RasterEquippedAgent(Agent):
             return {
                 "action_type": ActionType.NAVIGATE,
                 "position": np.array([x_nm, y_nm], dtype=np.float32),
-                "zoom": np.array([1.0], dtype=np.float32),
-                "dwell": np.array([1.0], dtype=np.float32),
+                "zoom": np.array([self._zoom], dtype=np.float32),
+                "dwell": np.array([self._dwell], dtype=np.float32),
                 "finding_type": 0,
             }
         else:
@@ -258,8 +262,8 @@ class RasterEquippedAgent(Agent):
             return {
                 "action_type": ActionType.ACQUIRE,
                 "position": np.array(self._current_target, dtype=np.float32),
-                "zoom": np.array([1.0], dtype=np.float32),
-                "dwell": np.array([1.0], dtype=np.float32),
+                "zoom": np.array([self._zoom], dtype=np.float32),
+                "dwell": np.array([self._dwell], dtype=np.float32),
                 "finding_type": 0,
             }
 

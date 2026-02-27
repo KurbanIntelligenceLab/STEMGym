@@ -139,6 +139,89 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "GP-UCB + Gemini 2.0 Flash VLM analyst",
         "kwargs": {"provider": "gemini_flash"},
     },
+    # -- Zoom/dwell ablation variants --
+    "raster_equipped_z2": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=2",
+        "kwargs": {"zoom": 2.0},
+    },
+    "raster_equipped_z4": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=4",
+        "kwargs": {"zoom": 4.0},
+    },
+    "raster_equipped_d05": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, dwell=0.5",
+        "kwargs": {"dwell": 0.5},
+    },
+    "raster_equipped_d2": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, dwell=2.0",
+        "kwargs": {"dwell": 2.0},
+    },
+    "raster_equipped_z2_d05": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=2 dwell=0.5",
+        "kwargs": {"zoom": 2.0, "dwell": 0.5},
+    },
+    "raster_equipped_z2_d2": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=2 dwell=2.0",
+        "kwargs": {"zoom": 2.0, "dwell": 2.0},
+    },
+    "raster_equipped_z4_d05": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=4 dwell=0.5",
+        "kwargs": {"zoom": 4.0, "dwell": 0.5},
+    },
+    "raster_equipped_z4_d2": {
+        "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
+        "description": "Raster + Analyst, zoom=4 dwell=2.0",
+        "kwargs": {"zoom": 4.0, "dwell": 2.0},
+    },
+    # -- Acquisition function variants --
+    "gp_ucb_ei": {
+        "class": "stem_gym.baselines.gp_ucb.GPUCBAgent",
+        "description": "GP-UCB with Expected Improvement",
+        "kwargs": {"initial_random": 3, "acq_func": "ei"},
+    },
+    "gp_ucb_ts": {
+        "class": "stem_gym.baselines.gp_ucb.GPUCBAgent",
+        "description": "GP-UCB with Thompson Sampling",
+        "kwargs": {"initial_random": 3, "acq_func": "ts"},
+    },
+    "gp_ucb_ei_equipped": {
+        "class": "stem_gym.baselines.equipped_baselines.GPUCBEquippedAgent",
+        "description": "GP-EI + trained Analyst",
+        "kwargs": {"initial_random": 3, "acq_func": "ei"},
+    },
+    "gp_ucb_ts_equipped": {
+        "class": "stem_gym.baselines.equipped_baselines.GPUCBEquippedAgent",
+        "description": "GP-TS + trained Analyst",
+        "kwargs": {"initial_random": 3, "acq_func": "ts"},
+    },
+    "stem_agent_ei": {
+        "class": "stem_gym.agents.multi_agent.STEMAgent",
+        "description": "Full STEMAgent with EI acquisition",
+        "kwargs": {"acq_func": "ei"},
+    },
+    "stem_agent_ts": {
+        "class": "stem_gym.agents.multi_agent.STEMAgent",
+        "description": "Full STEMAgent with Thompson Sampling",
+        "kwargs": {"acq_func": "ts"},
+    },
+    # -- DECLARE variants --
+    "stem_agent_declare": {
+        "class": "stem_gym.agents.multi_agent.STEMAgent",
+        "description": "STEMAgent with DECLARE annotations enabled",
+        "kwargs": {"use_declare": True},
+    },
+    "stem_agent_no_declare": {
+        "class": "stem_gym.agents.multi_agent.STEMAgent",
+        "description": "STEMAgent without DECLARE (explicit baseline)",
+        "kwargs": {"use_declare": False},
+    },
 }
 
 TASK_REGISTRY: dict[str, dict[str, Any]] = {
@@ -246,6 +329,7 @@ class ExperimentConfig:
     score_every_n_acquires: int = 5
     output: str | None = None
     workers: int = 1
+    save_trajectories: bool = False
 
 
 def load_config(path: str) -> ExperimentConfig:
@@ -264,6 +348,7 @@ def load_config(path: str) -> ExperimentConfig:
         score_every_n_acquires=data.get("score_every_n_acquires", 5),
         output=data.get("output"),
         workers=data.get("workers", 1),
+        save_trajectories=data.get("save_trajectories", False),
     )
 
 
@@ -271,8 +356,36 @@ def load_config(path: str) -> ExperimentConfig:
 # Result serialization
 # ---------------------------------------------------------------------------
 
-def _serialize_result(bench: BenchmarkResult, task_name: str, world_name: str) -> dict:
+def _serialize_result(
+    bench: BenchmarkResult, task_name: str, world_name: str,
+    save_trajectories: bool = False,
+) -> dict:
     """Convert BenchmarkResult to JSON-serializable dict."""
+    episodes = []
+    for i, r in enumerate(bench.episode_results):
+        ep = {
+            "seed": i,
+            "dec_auc": round(r.dec.auc, 6),
+            "final_score": round(r.final_score, 6),
+            "tiles_acquired": r.tiles_acquired,
+            "total_dose_used": round(r.total_dose_used, 1),
+            "total_steps": r.total_steps,
+            "dec_dose_fractions": r.dec.dose_fractions.tolist(),
+            "dec_scores": r.dec.scores.tolist(),
+        }
+        if save_trajectories:
+            ep["trajectory"] = [
+                {
+                    "step": e["step"],
+                    "action_type": e.get("action_type", -1),
+                    "dose_used": e["dose_used"],
+                    "tiles_acquired": e["tiles_acquired"],
+                    "position": list(e["position"]) if e.get("position") else None,
+                }
+                for e in r.episode_log
+            ]
+        episodes.append(ep)
+
     return {
         "agent": bench.agent_name,
         "task": task_name,
@@ -283,19 +396,7 @@ def _serialize_result(bench: BenchmarkResult, task_name: str, world_name: str) -
         "mean_final_score": round(bench.mean_final_score, 6),
         "mean_dose_used": round(bench.mean_dose_used, 1),
         "mean_tiles": round(bench.mean_tiles, 1),
-        "episodes": [
-            {
-                "seed": i,
-                "dec_auc": round(r.dec.auc, 6),
-                "final_score": round(r.final_score, 6),
-                "tiles_acquired": r.tiles_acquired,
-                "total_dose_used": round(r.total_dose_used, 1),
-                "total_steps": r.total_steps,
-                "dec_dose_fractions": r.dec.dose_fractions.tolist(),
-                "dec_scores": r.dec.scores.tolist(),
-            }
-            for i, r in enumerate(bench.episode_results)
-        ],
+        "episodes": episodes,
     }
 
 
@@ -449,7 +550,7 @@ def run_full_benchmark(
         env.close()
         elapsed = time.time() - t0
 
-        result = _serialize_result(bench, task_name, world_name)
+        result = _serialize_result(bench, task_name, world_name, save_trajectories=config.save_trajectories)
         result["elapsed_seconds"] = round(elapsed, 2)
         all_results.append(result)
 
@@ -511,6 +612,7 @@ def _run_full_benchmark_parallel(
                 "budget": config.budget,
                 "max_steps": config.max_steps,
                 "score_every_n_acquires": config.score_every_n_acquires,
+                "save_trajectories": config.save_trajectories,
             })
 
     total_jobs = len(jobs)
@@ -583,6 +685,7 @@ def _run_full_benchmark_parallel(
                                 "total_steps": e["total_steps"],
                                 "dec_dose_fractions": e["dec_dose_fractions"],
                                 "dec_scores": e["dec_scores"],
+                                **({"trajectory": e["trajectory"]} if "trajectory" in e else {}),
                             }
                             for e in episodes
                         ],
@@ -636,6 +739,7 @@ def _run_full_benchmark_parallel(
                     "total_steps": e["total_steps"],
                     "dec_dose_fractions": e["dec_dose_fractions"],
                     "dec_scores": e["dec_scores"],
+                    **({"trajectory": e["trajectory"]} if "trajectory" in e else {}),
                 }
                 for e in episodes
             ],
@@ -721,6 +825,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--shard", type=str, default=None,
         help="Shard spec 'K/N' — run shard K of N total (1-based). For distributed runs.",
     )
+    run_parser.add_argument(
+        "--save-trajectories", action="store_true", default=False,
+        help="Save per-step trajectory (position, action_type, dose) in results JSON",
+    )
 
     # -- merge command --
     merge_parser = sub.add_parser("merge", help="Merge shard result JSON files")
@@ -779,6 +887,8 @@ def cmd_run(args):
             config.output = args.output
         if args.workers != 1:
             config.workers = args.workers
+        if args.save_trajectories:
+            config.save_trajectories = True
     else:
         config = ExperimentConfig(
             agents=args.agent,
@@ -790,6 +900,7 @@ def cmd_run(args):
             score_every_n_acquires=args.score_every,
             output=args.output,
             workers=args.workers,
+            save_trajectories=args.save_trajectories,
         )
 
     # Validate

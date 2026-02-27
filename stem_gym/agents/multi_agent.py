@@ -58,19 +58,23 @@ class STEMAgent(Agent):
         planner: Planner | None = None,
         seed: int = 42,
         checkpoint_dir: str | Path | None = None,
+        acq_func: str = "ucb",
+        use_declare: bool = False,
     ):
         if analyst is None:
             analyst = self._try_load_analyst(checkpoint_dir)
         self.analyst = analyst or Analyst()
-        self.navigator = navigator or Navigator(seed=seed)
+        self.navigator = navigator or Navigator(seed=seed, acq_func=acq_func)
         self.planner = planner or Planner()
         self.seed = seed
+        self.use_declare = use_declare
 
         # Internal state
         self._state: ExperimentState | None = None
         self._phase: str = "navigate"  # "navigate" or "acquire"
         self._target_pos: tuple[float, float] = (0.0, 0.0)
         self._skip_acquire: bool = False
+        self._action_queue: list[dict[str, Any]] = []
 
     @staticmethod
     def _try_load_analyst(checkpoint_dir: str | Path | None) -> Analyst | None:
@@ -116,6 +120,14 @@ class STEMAgent(Agent):
 
         self._phase = "navigate"
         self._skip_acquire = False
+        self._action_queue.clear()
+
+    # DECLARE finding type index mapping (matches stem_env.py finding_types list)
+    _DEFECT_TO_FINDING_TYPE = {
+        "vacancy": 1,
+        "substitution": 2,
+        "interstitial": 3,
+    }
 
     def act(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> dict[str, Any]:
         """Select an action: navigate → acquire/skip → repeat."""
@@ -123,6 +135,10 @@ class STEMAgent(Agent):
 
         # Sync state from env observations
         self._sync_state(obs, info)
+
+        # Drain pending DECLARE actions first (zero-cost, no step consumed)
+        if self._action_queue:
+            return self._action_queue.pop(0)
 
         budget_frac = float(obs["budget_remaining"][0])
         if budget_frac < 0.01 or s.mode == PlannerMode.TERMINATE:
@@ -190,12 +206,28 @@ class STEMAgent(Agent):
                     tile_c = min(tile_c, gw - 1)
                     tile_key = (tile_r, tile_c)
 
+                defect_offset = len(self.analyst._all_defect_labels)
+
                 result = self.analyst.analyze_tile(
                     tile,
                     tile_position_nm=(x_nm, y_nm),
                     pixel_size_nm=s.pixel_size_nm,
                     tile_key=tile_key,
                 )
+
+                # Queue DECLARE actions for newly detected defects
+                if self.use_declare:
+                    new_labels = self.analyst._all_defect_labels[defect_offset:]
+                    for lbl in new_labels:
+                        ft_idx = self._DEFECT_TO_FINDING_TYPE.get(lbl)
+                        if ft_idx is not None:
+                            self._action_queue.append({
+                                "action_type": ActionType.DECLARE,
+                                "position": np.array([x_nm, y_nm], dtype=np.float32),
+                                "zoom": np.array([1.0], dtype=np.float32),
+                                "dwell": np.array([1.0], dtype=np.float32),
+                                "finding_type": ft_idx,
+                            })
 
                 # Update navigator with new observation
                 self.navigator.record_observation(s, tile, x_nm, y_nm)
