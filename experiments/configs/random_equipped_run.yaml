@@ -1,0 +1,33 @@
+# RandomEquippedAgent — Random navigation + trained Analyst
+# 1 agent × 4 tasks × 10 worlds × 5 seeds = 200 episodes
+# Tests whether random navigation with trained perception matches other equipped agents
+
+name: random_equipped_run
+
+agents:
+  - random_equipped
+
+tasks:
+  - defect_census
+  - phase_mapping
+  - targeted
+  - particle_census
+
+worlds:
+  - srtio3_clustered_easy_verified
+  - srtio3_clustered_medium_verified
+  - batio3_interface_easy_verified
+  - batio3_interface_medium_verified
+  - batio3_interface_hard_verified
+  - sige_gradient_clustered_easy_verified
+  - sige_gradient_clustered_medium_verified
+  - sige_gradient_clustered_hard_verified
+  - gan_easy_verified
+  - pt_nanoparticles_easy_verified
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/random_equipped_run.json

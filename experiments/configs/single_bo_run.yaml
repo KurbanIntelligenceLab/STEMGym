@@ -1,0 +1,37 @@
+# SingleBO agents — Joint BO over (x,y,zoom,dwell)
+# 2 agents × 2 tasks × 15 worlds × 5 seeds = 300 episodes
+# Tests whether joint 4D BO improves over 2D GP-UCB, and whether trained Analyst helps
+
+name: single_bo_run
+
+agents:
+  - single_bo
+  - single_bo_equipped
+
+tasks:
+  - defect_census
+  - phase_mapping
+
+worlds:
+  - srtio3_clustered_easy_verified
+  - srtio3_clustered_medium_verified
+  - srtio3_clustered_hard
+  - batio3_interface_easy_verified
+  - batio3_interface_medium_verified
+  - batio3_interface_hard_verified
+  - sige_gradient_clustered_easy_verified
+  - sige_gradient_clustered_medium_verified
+  - sige_gradient_clustered_hard_verified
+  - gan_easy_verified
+  - gan_medium_verified
+  - gan_hard_verified
+  - pt_nanoparticles_easy_verified
+  - pt_nanoparticles_medium
+  - pt_nanoparticles_hard
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/single_bo_run.json

@@ -91,6 +91,14 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",
         "description": "Raster + trained Analyst (fair comparison)",
     },
+    "random_equipped": {
+        "class": "stem_gym.baselines.equipped_baselines.RandomEquippedAgent",
+        "description": "Random navigation + trained Analyst (fair comparison)",
+    },
+    "single_bo_equipped": {
+        "class": "stem_gym.baselines.equipped_baselines.SingleBOEquippedAgent",
+        "description": "Joint BO over (x,y,zoom,dwell) + trained Analyst",
+    },
     "raster_vlm_claude": {
         "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
         "description": "Raster + Claude Haiku 4.5 VLM analyst",

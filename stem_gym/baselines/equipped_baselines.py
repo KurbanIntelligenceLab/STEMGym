@@ -19,6 +19,7 @@ import numpy as np
 from stem_gym.baselines import Agent
 from stem_gym.agents.analyst import Analyst
 from stem_gym.baselines.gp_ucb import GPUCBAgent
+from stem_gym.baselines.single_bo import SingleBOAgent
 from stem_gym.envs.stem_env import ActionType
 
 
@@ -259,6 +260,182 @@ class RasterEquippedAgent(Agent):
                 "position": np.array(self._current_target, dtype=np.float32),
                 "zoom": np.array([1.0], dtype=np.float32),
                 "dwell": np.array([1.0], dtype=np.float32),
+                "finding_type": 0,
+            }
+
+    def get_findings(self) -> dict[str, Any]:
+        return _assemble_findings(self.analyst, self._grid_shape)
+
+
+# ---------------------------------------------------------------------------
+# Random navigation + trained Analyst
+# ---------------------------------------------------------------------------
+
+
+class RandomEquippedAgent(Agent):
+    """Random navigation with the trained Analyst ensemble.
+
+    Uniform random position selection identical to RandomAgent, but using the
+    trained Analyst instead of SimpleAnalyst for tile analysis.
+    """
+
+    def __init__(
+        self,
+        seed: int = 42,
+        checkpoint_dir: str | Path | None = None,
+    ):
+        self.seed = seed
+        self.rng = np.random.default_rng(seed)
+        self.analyst = _load_analyst(checkpoint_dir)
+        self._grid_shape: tuple[int, int] = (1, 1)
+        self._fov_nm: tuple[float, float] = (1.0, 1.0)
+        self._pixel_size_nm: float = 0.005
+        self._navigate_phase = True
+
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+        self.analyst.reset()
+        self._grid_shape = obs["visited_mask"].shape
+        self._fov_nm = info.get("fov_nm", (100.0, 100.0))
+        self._pixel_size_nm = info.get("pixel_size_nm", 0.005)
+        self._navigate_phase = True
+
+    def _nm_to_grid(self, x_nm: float, y_nm: float) -> tuple[int, int]:
+        """Convert nm coordinates to grid indices."""
+        grid_h, grid_w = self._grid_shape
+        col = int(np.clip(x_nm / self._fov_nm[1] * grid_w, 0, grid_w - 1))
+        row = int(np.clip(y_nm / self._fov_nm[0] * grid_h, 0, grid_h - 1))
+        return row, col
+
+    def act(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> dict[str, Any]:
+        budget_frac = float(obs["budget_remaining"][0])
+
+        if budget_frac < 0.01:
+            return self._make_done_action()
+
+        if self._navigate_phase:
+            fov_h, fov_w = self._fov_nm
+            x = self.rng.uniform(0, fov_w)
+            y = self.rng.uniform(0, fov_h)
+            self._navigate_phase = False
+            return {
+                "action_type": ActionType.NAVIGATE,
+                "position": np.array([x, y], dtype=np.float32),
+                "zoom": np.array([1.0], dtype=np.float32),
+                "dwell": np.array([1.0], dtype=np.float32),
+                "finding_type": 0,
+            }
+        else:
+            self._navigate_phase = True
+            tile = obs.get("tile")
+            if tile is not None and tile.max() > 0:
+                pos = obs["position"]
+                x_nm, y_nm = float(pos[0]), float(pos[1])
+                row, col = self._nm_to_grid(x_nm, y_nm)
+                self.analyst.analyze_tile(
+                    tile,
+                    tile_position_nm=(x_nm, y_nm),
+                    pixel_size_nm=self._pixel_size_nm,
+                    tile_key=(row, col),
+                )
+
+            return {
+                "action_type": ActionType.ACQUIRE,
+                "position": obs["position"].copy(),
+                "zoom": np.array([1.0], dtype=np.float32),
+                "dwell": np.array([1.0], dtype=np.float32),
+                "finding_type": 0,
+            }
+
+    def get_findings(self) -> dict[str, Any]:
+        return _assemble_findings(self.analyst, self._grid_shape)
+
+
+# ---------------------------------------------------------------------------
+# Single-BO + trained Analyst
+# ---------------------------------------------------------------------------
+
+
+class SingleBOEquippedAgent(SingleBOAgent):
+    """Joint BO over (x, y, zoom, dwell) with the trained Analyst ensemble.
+
+    Inherits all BO logic from SingleBOAgent. Replaces the SimpleAnalyst
+    with the trained Analyst and adds position-aware tile analysis.
+    """
+
+    def __init__(
+        self,
+        seed: int = 42,
+        initial_random: int = 6,
+        checkpoint_dir: str | Path | None = None,
+    ):
+        super().__init__(seed=seed, initial_random=initial_random)
+        self.analyst = _load_analyst(checkpoint_dir)
+        self._pixel_size_nm: float = 0.005
+
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+        super().reset(obs, info)
+        self._pixel_size_nm = info.get("pixel_size_nm", 0.005)
+
+    def _nm_to_grid(self, x_nm: float, y_nm: float) -> tuple[int, int]:
+        """Convert nm coordinates to grid indices."""
+        grid_h, grid_w = self._grid_shape
+        col = int(np.clip(x_nm / self._fov_nm[1] * grid_w, 0, grid_w - 1))
+        row = int(np.clip(y_nm / self._fov_nm[0] * grid_h, 0, grid_h - 1))
+        return row, col
+
+    def act(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> dict[str, Any]:
+        self._step += 1
+        budget_frac = float(obs["budget_remaining"][0])
+
+        if budget_frac < 0.01:
+            return self._make_done_action()
+
+        if self._phase == "navigate":
+            x_n, y_n, zoom_n, dwell_n = self._select_next(obs)
+            x_nm, y_nm, zoom, dwell = self._denormalize(x_n, y_n, zoom_n, dwell_n)
+            self._next_params = (x_n, y_n, zoom_n, dwell_n)
+            self._phase = "acquire"
+
+            return {
+                "action_type": ActionType.NAVIGATE,
+                "position": np.array([x_nm, y_nm], dtype=np.float32),
+                "zoom": np.array([zoom], dtype=np.float32),
+                "dwell": np.array([dwell], dtype=np.float32),
+                "finding_type": 0,
+            }
+        else:
+            self._phase = "navigate"
+
+            tile = obs.get("tile")
+            interestingness = 0.0
+            if tile is not None and tile.max() > 0:
+                pos = obs["position"]
+                x_nm, y_nm = float(pos[0]), float(pos[1])
+                row, col = self._nm_to_grid(x_nm, y_nm)
+                self.analyst.analyze_tile(
+                    tile,
+                    tile_position_nm=(x_nm, y_nm),
+                    pixel_size_nm=self._pixel_size_nm,
+                    tile_key=(row, col),
+                )
+                interestingness = float(np.std(tile))
+
+            if self._next_params is not None:
+                self._X.append(list(self._next_params))
+                self._Y.append(interestingness)
+
+            if self._next_params:
+                _, _, zoom_n, dwell_n = self._next_params
+                zoom = 1.0 + zoom_n * 3.0
+                dwell = 0.1 + dwell_n * 9.9
+            else:
+                zoom, dwell = 1.0, 1.0
+
+            return {
+                "action_type": ActionType.ACQUIRE,
+                "position": obs["position"].copy(),
+                "zoom": np.array([zoom], dtype=np.float32),
+                "dwell": np.array([dwell], dtype=np.float32),
                 "finding_type": 0,
             }
 
