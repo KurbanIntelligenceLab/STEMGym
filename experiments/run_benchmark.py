@@ -295,6 +295,50 @@ def _serialize_result(bench: BenchmarkResult, task_name: str, world_name: str) -
 # Main benchmark runner
 # ---------------------------------------------------------------------------
 
+def _load_existing_results(output_path: str | None) -> list[dict]:
+    """Load previously saved results from an output file for resume support."""
+    if not output_path:
+        return []
+    p = Path(output_path)
+    if not p.exists():
+        return []
+    try:
+        with open(p) as f:
+            data = json.load(f)
+        results = data.get("results", [])
+        if results:
+            print(f"  Resuming: loaded {len(results)} existing results from {output_path}")
+        return results
+    except (json.JSONDecodeError, KeyError):
+        return []
+
+
+def _save_results_incremental(
+    output_path: str | None,
+    config: ExperimentConfig,
+    results: list[dict],
+) -> None:
+    """Save results incrementally to the output file."""
+    if not output_path:
+        return
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w") as f:
+        json.dump({
+            "config": {
+                "name": config.name,
+                "agents": config.agents,
+                "tasks": config.tasks,
+                "worlds": config.worlds,
+                "seeds": config.seeds,
+                "budget": config.budget,
+                "max_steps": config.max_steps,
+                "workers": config.workers,
+            },
+            "results": results,
+        }, f, indent=2)
+
+
 def run_full_benchmark(
     config: ExperimentConfig,
     verbose: bool = True,
@@ -331,6 +375,12 @@ def run_full_benchmark(
     total_episodes = total_runs * config.seeds
     workers = config.workers
 
+    # Resume support: load existing results and skip completed combos
+    existing_results = _load_existing_results(config.output)
+    completed_keys = {
+        (r["agent"], r["task"], r["world"]) for r in existing_results
+    }
+
     if verbose:
         print(f"\n{'='*70}")
         print(f"  STEMGym Benchmark: {config.name}")
@@ -344,15 +394,27 @@ def run_full_benchmark(
         if shard:
             print(f"  Shard:  {shard[0]}/{shard[1]}")
         print(f"  Total combinations: {total_runs} ({total_episodes} episodes)")
+        if completed_keys:
+            print(f"  Already completed: {len(completed_keys)} (resuming)")
         print(f"{'='*70}\n")
 
     # --- Parallel execution ---
     if workers > 1:
-        return _run_full_benchmark_parallel(config, combos, verbose=verbose)
+        return _run_full_benchmark_parallel(
+            config, combos, verbose=verbose,
+            existing_results=existing_results,
+            completed_keys=completed_keys,
+        )
 
     # --- Sequential execution (original path) ---
-    all_results = []
+    all_results = list(existing_results)
     for run_idx, (world_name, task_name, agent_name) in enumerate(combos, 1):
+        # Skip already completed combos
+        if (agent_name, task_name, world_name) in completed_keys:
+            if verbose:
+                print(f"  [{run_idx}/{total_runs}] {agent_name} / {task_name} / {world_name} — skipped (done)")
+            continue
+
         label = f"[{run_idx}/{total_runs}] {agent_name} / {task_name} / {world_name}"
 
         if verbose:
@@ -383,6 +445,9 @@ def run_full_benchmark(
         result["elapsed_seconds"] = round(elapsed, 2)
         all_results.append(result)
 
+        # Save incrementally after each combo
+        _save_results_incremental(config.output, config, all_results)
+
         if verbose:
             print(
                 f"  => DEC-AUC: {bench.mean_dec_auc:.4f} +/- {bench.std_dec_auc:.4f}"
@@ -397,6 +462,8 @@ def _run_full_benchmark_parallel(
     config: ExperimentConfig,
     combos: list[tuple[str, str, str]],
     verbose: bool = True,
+    existing_results: list[dict] | None = None,
+    completed_keys: set[tuple[str, str, str]] | None = None,
 ) -> list[dict]:
     """Run benchmark with parallel episode execution via ProcessPoolExecutor."""
     import multiprocessing as mp
@@ -404,12 +471,27 @@ def _run_full_benchmark_parallel(
 
     from stem_gym.runner import _run_episode_isolated
 
+    if existing_results is None:
+        existing_results = []
+    if completed_keys is None:
+        completed_keys = set()
+
     # Use 'spawn' for CUDA safety
     ctx = mp.get_context("spawn")
 
+    # Filter out already completed combos
+    remaining_combos = [
+        c for c in combos
+        if (c[2], c[1], c[0]) not in completed_keys  # (agent, task, world)
+    ]
+
+    if verbose and len(remaining_combos) < len(combos):
+        skipped = len(combos) - len(remaining_combos)
+        print(f"  Skipping {skipped} already-completed combinations\n")
+
     # Flatten all jobs: (agent, task, world, seed)
     jobs = []
-    for world_name, task_name, agent_name in combos:
+    for world_name, task_name, agent_name in remaining_combos:
         world_path = resolve_world(world_name)
         for seed in range(config.seeds):
             jobs.append({
@@ -431,7 +513,13 @@ def _run_full_benchmark_parallel(
 
     # Collect results keyed by (agent, task, world)
     results_by_combo: dict[tuple[str, str, str], list[dict]] = {}
-    completed = 0
+    completed_count = 0
+    # Track which combos are fully done (all seeds collected) for incremental saves
+    combo_seeds_expected = {
+        (c[2], c[1], c[0]): config.seeds for c in remaining_combos
+    }
+    saved_combos: set[tuple[str, str, str]] = set()
+    all_results = list(existing_results)
 
     with ProcessPoolExecutor(
         max_workers=config.workers,
@@ -446,7 +534,7 @@ def _run_full_benchmark_parallel(
         # Collect as completed
         for future in as_completed(future_to_job):
             job = future_to_job[future]
-            completed += 1
+            completed_count += 1
             key = (job["agent_name"], job["task_name"], job["world_name"])
 
             try:
@@ -454,14 +542,53 @@ def _run_full_benchmark_parallel(
                 results_by_combo.setdefault(key, []).append(episode_result)
                 if verbose:
                     print(
-                        f"  [{completed}/{total_jobs}] "
+                        f"  [{completed_count}/{total_jobs}] "
                         f"{key[0]}/{key[1]}/{key[2]} seed={job['seed']} "
                         f"DEC-AUC={episode_result['dec_auc']:.4f}"
                     )
+
+                # Incremental save: when all seeds for a combo are done
+                if (
+                    key not in saved_combos
+                    and len(results_by_combo.get(key, [])) >= combo_seeds_expected.get(key, config.seeds)
+                ):
+                    saved_combos.add(key)
+                    episodes = sorted(results_by_combo[key], key=lambda e: e["seed"])
+                    aucs = [e["dec_auc"] for e in episodes]
+                    combo_result = {
+                        "agent": key[0],
+                        "task": key[1],
+                        "world": key[2],
+                        "n_episodes": len(episodes),
+                        "mean_dec_auc": round(float(np.mean(aucs)), 6),
+                        "std_dec_auc": round(float(np.std(aucs)), 6),
+                        "mean_final_score": round(float(np.mean([e["final_score"] for e in episodes])), 6),
+                        "mean_dose_used": round(float(np.mean([e["total_dose_used"] for e in episodes])), 1),
+                        "mean_tiles": round(float(np.mean([e["tiles_acquired"] for e in episodes])), 1),
+                        "episodes": [
+                            {
+                                "seed": e["seed"],
+                                "dec_auc": round(e["dec_auc"], 6),
+                                "final_score": round(e["final_score"], 6),
+                                "tiles_acquired": e["tiles_acquired"],
+                                "total_dose_used": round(e["total_dose_used"], 1),
+                                "total_steps": e["total_steps"],
+                                "dec_dose_fractions": e["dec_dose_fractions"],
+                                "dec_scores": e["dec_scores"],
+                            }
+                            for e in episodes
+                        ],
+                        "elapsed_seconds": round(time.time() - t0, 2),
+                    }
+                    all_results.append(combo_result)
+                    _save_results_incremental(config.output, config, all_results)
+                    if verbose:
+                        print(f"    -> saved {key[0]}/{key[1]}/{key[2]} ({len(all_results)} total combos)")
+
             except Exception as e:
                 if verbose:
                     print(
-                        f"  [{completed}/{total_jobs}] "
+                        f"  [{completed_count}/{total_jobs}] "
                         f"{key[0]}/{key[1]}/{key[2]} seed={job['seed']} "
                         f"FAILED: {e}"
                     )
@@ -470,17 +597,16 @@ def _run_full_benchmark_parallel(
     if verbose:
         print(f"\n  Total parallel time: {elapsed:.1f}s")
 
-    # Aggregate into same format as sequential
-    all_results = []
-    for world_name, task_name, agent_name in combos:
+    # Add any combos that weren't incrementally saved (shouldn't happen, but safety)
+    for world_name, task_name, agent_name in remaining_combos:
         key = (agent_name, task_name, world_name)
+        if key in saved_combos:
+            continue
         episodes = results_by_combo.get(key, [])
         if not episodes:
             continue
 
-        # Sort by seed for consistent ordering
         episodes.sort(key=lambda e: e["seed"])
-
         aucs = [e["dec_auc"] for e in episodes]
         result = {
             "agent": agent_name,
@@ -706,25 +832,10 @@ def cmd_run(args):
     print(f"{'='*70}")
     print_summary_table(results)
 
-    # Save output
+    # Final save (also done incrementally during run for crash safety)
     output_path = config.output or args.output
     if output_path:
-        out = Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with open(out, "w") as f:
-            json.dump({
-                "config": {
-                    "name": config.name,
-                    "agents": config.agents,
-                    "tasks": config.tasks,
-                    "worlds": config.worlds,
-                    "seeds": config.seeds,
-                    "budget": config.budget,
-                    "max_steps": config.max_steps,
-                    "workers": config.workers,
-                },
-                "results": results,
-            }, f, indent=2)
+        _save_results_incremental(output_path, config, results)
         print(f"\n  Results saved to: {output_path}")
 
 
