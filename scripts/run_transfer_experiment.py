@@ -3,7 +3,7 @@
 
 Tests whether models trained on one material generalize to others.
 Trains separate checkpoints per material, then evaluates each on all
-materials (4×4 train/eval matrix).
+materials (5×5 train/eval matrix).
 
 Usage:
     python scripts/run_transfer_experiment.py \
@@ -17,6 +17,7 @@ Expects checkpoint layout:
         batio3/
         sige/
         gan/
+        pt/
 """
 
 from __future__ import annotations
@@ -47,6 +48,7 @@ MATERIALS = {
     "batio3": "batio3_interface_easy",
     "sige": "sige_gradient_clustered_easy",
     "gan": "gan_easy",
+    "pt": "pt_nanoparticles_easy",
 }
 
 # Agents to test (each supports checkpoint_dir kwarg)
@@ -106,15 +108,31 @@ def serialize_result(
 def run_transfer(
     checkpoint_base: Path,
     data_dir: Path,
+    output_path: Path,
     n_seeds: int = 5,
     budget: float = 5000.0,
     max_steps: int = 200,
     score_every: int = 5,
     verbose: bool = True,
 ) -> list[dict]:
-    """Run the full 4×4 transfer matrix for all agents."""
+    """Run the full 5×5 transfer matrix for all agents with resume support."""
     materials = list(MATERIALS.keys())
+
+    # --- Resume: load existing results and build completed set ---
     all_results = []
+    completed = set()
+    if output_path.exists():
+        try:
+            with open(output_path) as f:
+                existing = json.load(f)
+            all_results = existing.get("results", [])
+            for r in all_results:
+                key = (r["agent"], r["train_material"], r["eval_material"])
+                completed.add(key)
+            print(f"  Resuming: {len(completed)} combos already done, skipping them")
+        except (json.JSONDecodeError, KeyError):
+            print("  WARNING: Could not parse existing results, starting fresh")
+            all_results = []
 
     total_combos = len(AGENT_CONFIGS) * len(materials) * len(materials)
     combo_idx = 0
@@ -129,6 +147,14 @@ def run_transfer(
 
             for eval_mat in materials:
                 combo_idx += 1
+                combo_key = (agent_name, train_mat, eval_mat)
+
+                # Skip already-completed combos
+                if combo_key in completed:
+                    if verbose:
+                        print(f"  [{combo_idx}/{total_combos}] {agent_name} train={train_mat} eval={eval_mat} — SKIPPED (done)")
+                    continue
+
                 world_stem = MATERIALS[eval_mat]
 
                 try:
@@ -179,6 +205,26 @@ def run_transfer(
                 )
                 result["elapsed_seconds"] = round(elapsed, 2)
                 all_results.append(result)
+
+                # --- Incremental save after each combo ---
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_path, "w") as f:
+                    json.dump(
+                        {
+                            "config": {
+                                "name": "transfer_experiment",
+                                "checkpoint_base": str(checkpoint_base),
+                                "materials": MATERIALS,
+                                "agents": list(AGENT_CONFIGS.keys()),
+                                "seeds": n_seeds,
+                                "budget": budget,
+                                "max_steps": max_steps,
+                            },
+                            "results": all_results,
+                        },
+                        f,
+                        indent=2,
+                    )
 
                 if verbose:
                     print(
@@ -231,7 +277,7 @@ def main():
     if not checkpoint_base.exists():
         print(f"Error: Checkpoint base directory not found: {checkpoint_base}")
         print("Run training first:")
-        print("  for mat in srtio3 batio3 sige gan; do")
+        print("  for mat in srtio3 batio3 sige gan pt; do")
         print('    python scripts/train_atom_finder.py --world data/simulated/${mat}*_easy*.h5 \\')
         print(f"      --output checkpoints/transfer/$mat --epochs 30 --device cuda")
         print("  done")
@@ -251,9 +297,11 @@ def main():
     print(f"  Total episodes: {total}")
     print(f"{'='*70}\n")
 
+    out = Path(args.output)
     results = run_transfer(
         checkpoint_base=checkpoint_base,
         data_dir=data_dir,
+        output_path=out,
         n_seeds=args.seeds,
         budget=args.budget,
         max_steps=args.max_steps,
@@ -261,8 +309,7 @@ def main():
         verbose=verbose,
     )
 
-    # Save results
-    out = Path(args.output)
+    # Final save (in case no new combos were run)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
         json.dump(
