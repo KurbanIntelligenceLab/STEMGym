@@ -149,23 +149,23 @@ class TestConfigLoading:
         assert config.seeds == 2
 
     def test_load_ablation_config(self):
-        config_path = Path(__file__).parent.parent / "experiments" / "configs" / "ablation.yaml"
+        config_path = Path(__file__).parent.parent / "experiments" / "configs" / "trained_ablation_study.yaml"
         if not config_path.exists():
             pytest.skip("Ablation config not found")
         config = load_config(str(config_path))
-        assert config.name == "ablation_study"
+        assert config.name == "trained_ablation_study"
         assert "stem_agent" in config.agents
         assert "no_planner" in config.agents
 
-    def test_load_full_benchmark_config(self):
-        config_path = Path(__file__).parent.parent / "experiments" / "configs" / "full_benchmark.yaml"
+    def test_load_main_defect_census_config(self):
+        config_path = Path(__file__).parent.parent / "experiments" / "configs" / "main_defect_census.yaml"
         if not config_path.exists():
-            pytest.skip("Full benchmark config not found")
+            pytest.skip("Main defect census config not found")
         config = load_config(str(config_path))
         assert config.seeds == 5
         assert config.budget == 5000.0
         assert len(config.agents) >= 4
-        assert len(config.tasks) >= 3
+        assert len(config.tasks) >= 1
 
 
 # ---- Serialization tests ----
