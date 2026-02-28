@@ -31,7 +31,7 @@ python scripts/download_data.py --transfer   # transfer-learning checkpoints (~3
 Or generate the test world locally (no GPU needed):
 
 ```bash
-python data/scripts/generate_test_world.py
+python scripts/generate_worlds/generate_test_world.py
 ```
 
 ## Quick Start
@@ -93,8 +93,9 @@ stem_gym/          Core package
   runner.py        Episode and benchmark execution
 experiments/       Configs and CLI runner
 scripts/           Data download, model training, human baseline UI
+  generate_worlds/ World-generation scripts (abTEM simulation)
 building_utils/    Internal analysis and cloud deployment tooling
-data/              Simulated worlds (HDF5) and generation scripts
+data/              Simulated worlds (HDF5)
 checkpoints/       Trained neural model weights
 tests/             Test suite
 ```
