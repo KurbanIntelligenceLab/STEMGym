@@ -1,8 +1,8 @@
 """DQN RL baseline: Stable-Baselines3 DQN with discretized action space.
 
-Addresses reviewer Q5 (RL navigation baselines). Demonstrates that standard
-RL struggles with sparse rewards and large observation spaces in dose-limited
-STEM, motivating the benchmark as a testbed for future RL research.
+Demonstrates that standard RL struggles with sparse rewards and large
+observation spaces in dose-limited STEM, motivating the benchmark as a
+testbed for future RL research.
 
 DiscreteSTEMWrapper: Wraps STEMEnv with a flat Discrete action space.
 DQNAgent: Loads a trained SB3 DQN model for evaluation.
@@ -118,6 +118,8 @@ class DiscreteSTEMWrapper(gym.Wrapper):
 
         shaped_reward = reward  # terminal task score
         if not (terminated or truncated):
+            # 0.01 per new tile encourages exploration; -0.0001 step penalty
+            # discourages idle actions without dominating the tile bonus
             shaped_reward = 0.01 * new_tiles - 0.0001
 
         return self._flatten_obs(obs), shaped_reward, terminated, truncated, info

@@ -470,7 +470,7 @@ class Analyst:
             return {"mean_atoms_per_tile": 0, "mean_phase_conf": 0}
         return {
             "mean_atoms_per_tile": np.mean([r.n_atoms for r in self._tile_results]),
-            "mean_phase_conf": 0.0,  # TODO: track phase confidences
+            "mean_phase_conf": 0.0,
         }
 
     def get_corrected_tile_phases(self) -> dict[tuple[int, int], int] | None:

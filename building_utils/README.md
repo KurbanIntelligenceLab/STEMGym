@@ -7,7 +7,7 @@ Internal tooling — not needed by reviewers, but essential for development.
 | Script | Purpose | Example |
 |--------|---------|---------|
 | `statistical_analysis.py` | Bootstrap CIs, Wilcoxon tests, LaTeX tables | `python building_utils/analysis/statistical_analysis.py results/` |
-| `cadence_sensitivity.py` | Scoring cadence robustness (reviewer Q2) | `python building_utils/analysis/cadence_sensitivity.py` |
+| `cadence_sensitivity.py` | Scoring cadence robustness analysis | `python building_utils/analysis/cadence_sensitivity.py` |
 | `run_transfer_experiment.py` | 5×5 cross-material transfer matrix | `python building_utils/analysis/run_transfer_experiment.py` |
 | `plot_trajectories.py` | Agent navigation path visualization | `python building_utils/analysis/plot_trajectories.py results/*.json` |
 | `plot_pareto_hypervolume.py` | Pareto front + hypervolume for composite task | `python building_utils/analysis/plot_pareto_hypervolume.py` |

@@ -359,7 +359,7 @@ def build_ui(session: HumanSession):
         gr.Markdown(
             f"**World:** `{Path(session.world_path).stem}` | "
             f"**Task:** `{session.task_name}` | "
-            f"**Budget:** {session.budget:.0f} e-/A^2"
+            f"**Budget:** {session.budget:.0f} e⁻/Å²"
         )
 
         with gr.Row():

@@ -17,11 +17,10 @@ two-step acquire cycle.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import numpy as np
-
-from pathlib import Path
 
 from stem_gym.baselines import Agent
 from stem_gym.agents.analyst import Analyst

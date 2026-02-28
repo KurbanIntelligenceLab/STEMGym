@@ -22,7 +22,10 @@ Requires Python >= 3.10.
 Download the simulated worlds and model checkpoints from Hugging Face:
 
 ```bash
-python scripts/download_data.py
+python scripts/download_data.py              # everything (worlds + checkpoints + transfer)
+python scripts/download_data.py --worlds     # only HDF5 worlds
+python scripts/download_data.py --checkpoints # main checkpoints + DQN
+python scripts/download_data.py --transfer   # transfer-learning checkpoints (~388 MB)
 ```
 
 Or generate the test world locally (no GPU needed):
@@ -46,7 +49,7 @@ stemgym list tasks
 stemgym list worlds
 
 # Dry run (print plan without executing)
-stemgym run --config experiments/configs/full_benchmark.yaml --dry-run
+stemgym run --config experiments/configs/main_defect_census.yaml --dry-run
 ```
 
 ## Agents
@@ -60,6 +63,13 @@ stemgym run --config experiments/configs/full_benchmark.yaml --dry-run
 | `stem_agent` | Full multi-agent system (Navigator + Analyst + Planner) |
 | `raster_equipped` | Raster + trained Analyst (fair comparison) |
 | `gp_ucb_equipped` | GP-UCB + trained Analyst (fair comparison) |
+| `random_equipped` | Random + trained Analyst |
+| `single_bo_equipped` | Joint BO + trained Analyst |
+| `dqn` | DQN RL navigation baseline (SB3) |
+| `dqn_equipped` | DQN navigation + trained Analyst |
+| `llm_planner` | LLM-based planner via OpenRouter |
+
+Run `stemgym list agents` for the full list (41 agents including VLM, ablation, and acquisition function variants).
 
 ## Tasks
 
@@ -68,6 +78,8 @@ stemgym run --config experiments/configs/full_benchmark.yaml --dry-run
 | `defect_census` | F1 | Detect and classify crystal defects |
 | `phase_mapping` | IoU | Identify material phases |
 | `targeted` | Spatial F1 | Locate specific target features |
+| `particle_census` | Detection + sizing | Nanoparticle detection, sizing, and morphology |
+| `composite` | Weighted | Multi-objective: defect census + phase mapping |
 
 ## Project Structure
 
@@ -75,11 +87,13 @@ stemgym run --config experiments/configs/full_benchmark.yaml --dry-run
 stem_gym/          Core package
   envs/            Gymnasium environment + HDF5 world
   agents/          Multi-agent system (Navigator, Analyst, Planner)
-  baselines/       Baseline agents (Random, Raster, GP-UCB, SingleBO)
+  baselines/       Baseline agents (Random, Raster, GP-UCB, SingleBO, DQN, VLM)
   tasks/           Task definitions and scoring
   metrics.py       DEC curve computation
   runner.py        Episode and benchmark execution
 experiments/       Configs and CLI runner
+scripts/           Data download, model training, human baseline UI
+building_utils/    Internal analysis and cloud deployment tooling
 data/              Simulated worlds (HDF5) and generation scripts
 checkpoints/       Trained neural model weights
 tests/             Test suite
@@ -89,12 +103,19 @@ tests/             Test suite
 
 Code: MIT. Data: CC-BY-4.0.
 
+## Authors
+
+- **Can Polat** — Texas A&M University, USA
+- **Erchin Serpedin** — Texas A&M University, USA
+- **Mustafa Kurban** (corresponding) — Ankara University, Turkey & Texas A&M University at Qatar
+- **Hasan Kurban** (corresponding) — Hamad Bin Khalifa University, Qatar
+
 ## Citation
 
 ```bibtex
-@inproceedings{stemgym2026,
-  title={STEMGym: A Benchmark for Dose-Efficient Autonomous STEM Microscopy},
-  author={Polat, John},
+@article{stemgym2026,
+  title={{STEMGym}: A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Transmission Electron Microscopy},
+  author={Polat, Can and Serpedin, Erchin and Kurban, Mustafa and Kurban, Hasan},
   year={2026}
 }
 ```

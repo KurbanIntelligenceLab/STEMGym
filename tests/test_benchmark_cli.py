@@ -64,6 +64,8 @@ class TestRegistries:
             "adaptive_raster", "adaptive_stem",
             # DECLARE variants
             "stem_agent_declare", "stem_agent_no_declare",
+            # DQN RL baselines
+            "dqn", "dqn_equipped",
         }
         assert expected == set(AGENT_REGISTRY.keys())
 

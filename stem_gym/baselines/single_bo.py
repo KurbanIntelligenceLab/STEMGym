@@ -46,7 +46,6 @@ class SingleBOAgent(Agent):
         self._grid_shape: tuple[int, int] = (1, 1)
         self._fov_nm: tuple[float, float] = (1.0, 1.0)
         self._step = 0
-        self._pending_action: dict[str, Any] | None = None
         self._phase = "navigate"  # "navigate" or "acquire"
         self._next_params: tuple[float, float, float, float] | None = None
 
@@ -62,8 +61,6 @@ class SingleBOAgent(Agent):
 
     def _select_next(self, obs: dict[str, np.ndarray]) -> tuple[float, float, float, float]:
         """Select (x_nm, y_nm, zoom, dwell) via BO or random."""
-
-        grid_h, grid_w = self._grid_shape
 
         if len(self._X) < self.initial_random:
             # Random exploration
@@ -176,15 +173,6 @@ class SingleBOAgent(Agent):
                 "dwell": np.array([dwell], dtype=np.float32),
                 "finding_type": 0,
             }
-
-    def _make_done_action(self) -> dict[str, Any]:
-        return {
-            "action_type": ActionType.DONE,
-            "position": np.array([0.0, 0.0], dtype=np.float32),
-            "zoom": np.array([1.0], dtype=np.float32),
-            "dwell": np.array([1.0], dtype=np.float32),
-            "finding_type": 0,
-        }
 
     def get_findings(self) -> dict[str, Any]:
         return {

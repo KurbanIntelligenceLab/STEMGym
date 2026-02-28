@@ -20,9 +20,9 @@ tasks:
   - phase_mapping
 
 worlds:
-  - batio3_interface_easy_verified
-  - batio3_interface_medium_verified
-  - batio3_interface_hard_verified
+  - batio3_interface_easy
+  - batio3_interface_medium
+  - batio3_interface_hard
 
 seeds: 5
 budget: 5000.0

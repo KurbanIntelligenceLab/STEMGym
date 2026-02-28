@@ -2,19 +2,19 @@
 """STEMGym Benchmark Runner CLI.
 
 Usage:
-    python -m experiments.run_benchmark --config experiments/configs/full_benchmark.yaml
+    python -m experiments.run_benchmark --config experiments/configs/quick_smoke.yaml
     python -m experiments.run_benchmark --agent stem_agent --task defect_census --world data/simulated/test_world.h5
-    stemgym run --config experiments/configs/ablation.yaml --output results/ablation.json
+    stemgym run --config experiments/configs/main_defect_census.yaml --output results/defect.json
 
 Examples:
     # Quick smoke test
     stemgym run --agent random raster --task defect_census --world data/simulated/test_world.h5 --seeds 2 --budget 3000
 
     # Full benchmark from config
-    stemgym run --config experiments/configs/full_benchmark.yaml --output results/full.json
+    stemgym run --config experiments/configs/main_defect_census.yaml --output results/defect.json
 
     # Dry run (print plan without executing)
-    stemgym run --config experiments/configs/full_benchmark.yaml --dry-run
+    stemgym run --config experiments/configs/main_defect_census.yaml --dry-run
 """
 
 from __future__ import annotations

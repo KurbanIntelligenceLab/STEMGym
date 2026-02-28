@@ -13,19 +13,19 @@ tasks:
   - phase_mapping
 
 worlds:
-  - srtio3_clustered_easy_verified
-  - srtio3_clustered_medium_verified
+  - srtio3_clustered_easy
+  - srtio3_clustered_medium
   - srtio3_clustered_hard
-  - batio3_interface_easy_verified
-  - batio3_interface_medium_verified
-  - batio3_interface_hard_verified
-  - sige_gradient_clustered_easy_verified
-  - sige_gradient_clustered_medium_verified
-  - sige_gradient_clustered_hard_verified
-  - gan_easy_verified
-  - gan_medium_verified
-  - gan_hard_verified
-  - pt_nanoparticles_easy_verified
+  - batio3_interface_easy
+  - batio3_interface_medium
+  - batio3_interface_hard
+  - sige_gradient_clustered_easy
+  - sige_gradient_clustered_medium
+  - sige_gradient_clustered_hard
+  - gan_easy
+  - gan_medium
+  - gan_hard
+  - pt_nanoparticles_easy
   - pt_nanoparticles_medium
   - pt_nanoparticles_hard
 

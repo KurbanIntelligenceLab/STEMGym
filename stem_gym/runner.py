@@ -104,6 +104,8 @@ def run_episode(
     acquires_since_score = 0
     last_tiles_acquired = 0
 
+    # +10 buffer: DECLARE annotation actions don't consume dose or count
+    # toward max_steps, so the loop may need extra iterations to converge
     for step in range(env._init_max_steps + 10):
         action = agent.act(obs, info)
         obs, reward, terminated, truncated, info = env.step(action)

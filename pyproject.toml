@@ -9,6 +9,16 @@ description = "Gym-compatible benchmark for autonomous STEM microscopy"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+authors = [
+    {name = "Can Polat", email = "canpolat@tamu.edu"},
+    {name = "Erchin Serpedin"},
+    {name = "Mustafa Kurban"},
+    {name = "Hasan Kurban"},
+]
+
+[project.urls]
+Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
+Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
 dependencies = [
     "gymnasium>=0.29",
     "numpy>=1.24",

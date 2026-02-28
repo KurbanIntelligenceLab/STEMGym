@@ -11,9 +11,9 @@ tasks:
   - targeted
 
 worlds:
-  - batio3_interface_easy_verified
-  - srtio3_clustered_easy_verified
-  - sige_gradient_clustered_easy_verified
+  - batio3_interface_easy
+  - srtio3_clustered_easy
+  - sige_gradient_clustered_easy
 
 seeds: 1
 budget: 3000.0

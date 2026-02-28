@@ -1,4 +1,4 @@
-# RL Baseline — DQN agent evaluation (addresses reviewer Q5)
+# RL Baseline — DQN agent evaluation
 # 2 agents × defect_census × 5 easy worlds × 5 seeds = 50 episodes
 # Demonstrates RL struggles with sparse rewards in dose-limited STEM
 
