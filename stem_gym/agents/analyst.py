@@ -84,6 +84,8 @@ class Analyst:
         # Phase heuristic: track mean intensity per tile for median-split
         self._phase_intensities: list[float] = []
         self._phase_tile_keys: list[tuple[int, int]] = []
+        # Neural model phase predictions per tile (used when model is available)
+        self._phase_model_predictions: dict[tuple[int, int], int] = {}
 
     def reset(self) -> None:
         self._tile_results.clear()
@@ -95,6 +97,7 @@ class Analyst:
         self._phase_id_pred_counts.clear()
         self._phase_intensities.clear()
         self._phase_tile_keys.clear()
+        self._phase_model_predictions.clear()
 
     @classmethod
     def from_checkpoint(cls, checkpoint_dir: str | Path, device: str | None = None) -> "Analyst":
@@ -414,6 +417,9 @@ class Analyst:
         # since _heuristic_phase appends to _phase_intensities)
         if tile_key is not None:
             self._phase_tile_keys.append(tile_key)
+            # Store neural model prediction if model was used (not heuristic)
+            if self.phase_identifier is not None:
+                self._phase_model_predictions[tile_key] = phase_label
 
         # Count defects
         n_vac = int(np.sum(defect_labels == 1))
@@ -474,26 +480,34 @@ class Analyst:
         }
 
     def get_corrected_tile_phases(self) -> dict[tuple[int, int], int] | None:
-        """Return tile-level phase labels after bimodality significance test.
+        """Return tile-level phase labels.
 
-        Re-labels all observed tiles using a global median split on mean
-        intensity, then checks whether the intensity distribution is
-        genuinely bimodal using the bimodality coefficient
-        (BC = (skew² + 1) / kurtosis; BC > 5/9 indicates bimodality).
+        When a trained neural phase identifier was used, returns its
+        predictions directly (if non-degenerate: at least 2 distinct
+        classes observed).
 
-        A median split of a unimodal distribution always produces two
-        groups, but the underlying distribution has low BC (~0.33 for
-        normal).  A genuine two-phase world produces high BC (>0.555).
+        When only the intensity heuristic was used (no neural model),
+        applies a bimodality coefficient (BC) significance test on mean
+        tile intensities to guard against false-positive phase maps on
+        single-phase worlds.
 
         Returns:
-            dict mapping (row, col) → phase label (0 or 1), or None if the
-            distribution is unimodal (single-phase world or too few tiles).
+            dict mapping (row, col) → phase label, or None if phase map
+            cannot be determined (single-phase world or too few tiles).
         """
+        # Prefer neural model predictions when available
+        if self._phase_model_predictions:
+            distinct = set(self._phase_model_predictions.values())
+            if len(distinct) >= 2:
+                return dict(self._phase_model_predictions)
+            # Model predicted only one class — single-phase world
+            return None
+
+        # Fallback: intensity heuristic with bimodality test
         if len(self._phase_intensities) < 4 or len(self._phase_tile_keys) < 4:
             return None
 
         intensities = np.array(self._phase_intensities)
-        n = len(intensities)
 
         # Bimodality coefficient: BC = (skew² + 1) / kurtosis
         # For normal: BC ≈ 0.33; threshold 5/9 ≈ 0.555 indicates bimodality
