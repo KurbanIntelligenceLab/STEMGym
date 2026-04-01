@@ -16,9 +16,6 @@ authors = [
     {name = "Hasan Kurban"},
 ]
 
-[project.urls]
-Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
-Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
 dependencies = [
     "gymnasium>=0.29",
     "numpy>=1.24",
@@ -30,6 +27,10 @@ dependencies = [
     "pyyaml>=6.0",
     "scikit-image>=0.21",
 ]
+
+[project.urls]
+Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
+Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
 
 [project.optional-dependencies]
 sim = [
