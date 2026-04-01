@@ -538,7 +538,7 @@ def run_stem_simulation(
 
     For structures larger than ``config.sim_tile_nm``, the XY plane is
     divided into overlapping tiles, each simulated independently, then
-    blended together with cosine-weighted overlap.
+    blended together with linearly-weighted overlap.
 
     Args:
         atoms: Structure (with or without frozen phonons already applied).

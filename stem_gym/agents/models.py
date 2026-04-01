@@ -2,7 +2,7 @@
 
 AtomFinderUNet: 4-level U-Net for atom position probability maps.
 DefectClassifierCNN: Small CNN for per-atom defect classification.
-PhaseIdentifierResNet: ResNet-18 variant for phase identification.
+PhaseIdentifierResNet: Lightweight ResNet variant for phase identification.
 """
 
 from __future__ import annotations
@@ -235,7 +235,7 @@ class PhaseIdentifierResNet(nn.Module):
     Output: (B, n_phases) logits
 
     Architecture: conv-stem → 4 ResBlocks → global avg pool → FC
-    Lighter than full ResNet-18 since our patches are small and grayscale.
+    Lightweight variant since our patches are small and grayscale.
     """
 
     def __init__(self, n_phases: int = 2, base_channels: int = 64):

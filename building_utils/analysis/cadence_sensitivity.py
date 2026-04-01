@@ -209,8 +209,17 @@ def analyze_cadence_sensitivity(
 # Plotting
 # ---------------------------------------------------------------------------
 
-def plot_cadence_figure(analysis: dict, output_dir: Path) -> None:
-    """Generate cadence sensitivity figure with two panels."""
+def plot_cadence_figure(
+    analysis: dict,
+    output_dir: Path,
+    extra_rank_corrs: dict[str, dict[int, float]] | None = None,
+) -> None:
+    """Generate cadence sensitivity figure with two panels.
+
+    Args:
+        extra_rank_corrs: Optional dict of {task_label -> {cadence -> rho}} for
+            additional Spearman lines in panel (b).
+    """
     per_cadence = analysis["per_cadence"]
     rank_corrs = analysis["rank_correlations"]
     agents = analysis["agents"]
@@ -248,18 +257,40 @@ def plot_cadence_figure(analysis: dict, output_dir: Path) -> None:
     ax1.spines["right"].set_visible(False)
     ax1.set_title("(a) DEC-AUC vs scoring cadence", fontsize=8, fontweight="bold")
 
-    # Panel B: Spearman rank correlation
+    # Panel B: Spearman rank correlation — per task
+    task_colors = {
+        "Defect Census": "#4CAF50",
+        "Phase Mapping": "#2196F3",
+        "Targeted": "#FF9800",
+    }
+    task_markers = {
+        "Defect Census": "s",
+        "Phase Mapping": "D",
+        "Targeted": "^",
+    }
+
     rhos = [rank_corrs[c] for c in cadences]
-    ax2.plot(cadences, rhos, "s-", color="#1565C0", markersize=6, linewidth=1.5)
+    ax2.plot(cadences, rhos, marker=task_markers["Defect Census"], linestyle="-",
+             color=task_colors["Defect Census"], markersize=5, linewidth=1.5,
+             label="Defect Census")
+
+    if extra_rank_corrs:
+        for task_label, corrs in extra_rank_corrs.items():
+            rhos_extra = [corrs.get(c, np.nan) for c in cadences]
+            ax2.plot(cadences, rhos_extra,
+                     marker=task_markers.get(task_label, "o"), linestyle="-",
+                     color=task_colors.get(task_label, "#333333"),
+                     markersize=5, linewidth=1.5, label=task_label)
+
     ax2.axhline(0.95, color="#999999", linestyle="--", linewidth=0.8, label=r"$\rho = 0.95$")
     ax2.set_xlabel("Scoring cadence (every $N$ acquisitions)")
     ax2.set_ylabel(r"Spearman $\rho$ (vs cadence = 5)")
     ax2.set_xticks(cadences)
-    ax2.set_ylim(0.5, 1.05)
+    ax2.set_ylim(0.85, 1.03)
     ax2.legend(fontsize=6, frameon=True, fancybox=False, edgecolor="#CCCCCC")
     ax2.spines["top"].set_visible(False)
     ax2.spines["right"].set_visible(False)
-    ax2.set_title("(b) Rank stability", fontsize=8, fontweight="bold")
+    ax2.set_title("(b) Rank stability across tasks", fontsize=8, fontweight="bold")
 
     fig.tight_layout()
     outpath = output_dir / "fig_cadence_sensitivity.pdf"
@@ -285,16 +316,16 @@ def main():
     print()
 
     # Load primary dataset
-    results = load_results(args.results_dir / "main_defect_census.json")
-    if not results:
+    results_dc = load_results(args.results_dir / "main_defect_census.json")
+    if not results_dc:
         print("ERROR: No results found. Run experiments first.")
         return
 
-    print(f"Loaded {len(results)} result entries")
+    print(f"Loaded {len(results_dc)} defect census entries")
 
-    # Run analysis
+    # Run analysis for primary task
     cadences = [1, 2, 5, 10, 20]
-    analysis = analyze_cadence_sensitivity(results, cadences=cadences)
+    analysis = analyze_cadence_sensitivity(results_dc, cadences=cadences)
 
     # Print results table
     agents = analysis["agents"]
@@ -321,8 +352,27 @@ def main():
         rho = rank_corrs[c]
         print(f"  Cadence {c:>2}: ρ = {rho:.4f}")
 
+    # Run cadence analysis for additional tasks
+    extra_rank_corrs = {}
+
+    results_pm = load_results(args.results_dir / "main_phase_mapping.json")
+    if results_pm:
+        print(f"\nLoaded {len(results_pm)} phase mapping entries")
+        pm_analysis = analyze_cadence_sensitivity(results_pm, cadences=cadences, task="phase_mapping")
+        if pm_analysis["rank_correlations"]:
+            extra_rank_corrs["Phase Mapping"] = pm_analysis["rank_correlations"]
+            print("Phase Mapping Spearman ρ:", {c: f"{r:.4f}" for c, r in pm_analysis["rank_correlations"].items()})
+
+    results_tgt = load_results(args.results_dir / "main_targeted.json")
+    if results_tgt:
+        print(f"\nLoaded {len(results_tgt)} targeted entries")
+        tgt_analysis = analyze_cadence_sensitivity(results_tgt, cadences=cadences, task="targeted")
+        if tgt_analysis["rank_correlations"]:
+            extra_rank_corrs["Targeted"] = tgt_analysis["rank_correlations"]
+            print("Targeted Spearman ρ:", {c: f"{r:.4f}" for c, r in tgt_analysis["rank_correlations"].items()})
+
     # Plot
-    plot_cadence_figure(analysis, args.output)
+    plot_cadence_figure(analysis, args.output, extra_rank_corrs=extra_rank_corrs)
 
 
 if __name__ == "__main__":
