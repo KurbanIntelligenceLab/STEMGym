@@ -1,5 +1,5 @@
 # Particle Census: Pt nanoparticle detection, sizing, and morphology
-# 9 agents × 1 task × 3 Pt worlds × 5 seeds = 135 episodes
+# 15 agents × 1 task × 3 Pt worlds × 10 seeds = 450 episodes
 
 name: particle_census
 
@@ -13,6 +13,12 @@ agents:
   - no_planner
   - no_uncertainty
   - rule_planner
+  - dqn
+  - dqn_equipped
+  - ppo
+  - ppo_equipped
+  - sac
+  - sac_equipped
 
 tasks:
   - particle_census
@@ -22,7 +28,7 @@ worlds:
   - pt_nanoparticles_medium
   - pt_nanoparticles_hard
 
-seeds: 5
+seeds: 10
 budget: 5000.0
 max_steps: 200
 score_every_n_acquires: 5

@@ -240,6 +240,24 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "class": "stem_gym.baselines.rl_agent.DQNEquippedAgent",
         "description": "DQN navigation + trained Analyst",
     },
+    # -- PPO RL baselines --
+    "ppo": {
+        "class": "stem_gym.baselines.rl_agent.PPOAgent",
+        "description": "PPO RL navigation baseline (SB3, discrete)",
+    },
+    "ppo_equipped": {
+        "class": "stem_gym.baselines.rl_agent.PPOEquippedAgent",
+        "description": "PPO navigation + trained Analyst",
+    },
+    # -- SAC RL baselines --
+    "sac": {
+        "class": "stem_gym.baselines.rl_agent.SACAgent",
+        "description": "SAC RL navigation baseline (SB3, continuous)",
+    },
+    "sac_equipped": {
+        "class": "stem_gym.baselines.rl_agent.SACEquippedAgent",
+        "description": "SAC navigation + trained Analyst",
+    },
 }
 
 TASK_REGISTRY: dict[str, dict[str, Any]] = {
@@ -392,6 +410,7 @@ def _serialize_result(
             "tiles_acquired": r.tiles_acquired,
             "total_dose_used": round(r.total_dose_used, 1),
             "total_steps": r.total_steps,
+            "elapsed_seconds": round(r.elapsed_seconds, 3),
             "dec_dose_fractions": r.dec.dose_fractions.tolist(),
             "dec_scores": r.dec.scores.tolist(),
         }

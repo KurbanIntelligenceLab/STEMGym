@@ -41,6 +41,10 @@ checkpoints/
 
 # Results (generated, not tracked)
 results/
+results_old/
+
+# Backup directories
+checkpoints_old/
 
 # Notebooks (local analysis, not tracked)
 notebooks/

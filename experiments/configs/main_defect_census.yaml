@@ -1,5 +1,5 @@
 # Main Benchmark — Defect Census Task
-# 10 agents × 7 worlds × 5 seeds = 350 episodes
+# 16 agents × 7 worlds × 10 seeds = 1120 episodes
 
 name: main_defect_census
 
@@ -14,6 +14,12 @@ agents:
   - no_uncertainty
   - rule_planner
   - llm_planner
+  - dqn
+  - dqn_equipped
+  - ppo
+  - ppo_equipped
+  - sac
+  - sac_equipped
 
 tasks:
   - defect_census
@@ -27,7 +33,7 @@ worlds:
   - sige_gradient_clustered_easy
   - sige_gradient_clustered_medium
 
-seeds: 5
+seeds: 10
 budget: 5000.0
 max_steps: 200
 score_every_n_acquires: 5

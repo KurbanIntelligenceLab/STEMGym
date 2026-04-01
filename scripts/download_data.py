@@ -48,6 +48,8 @@ CHECKPOINT_FILES = [
     "defect_classifier.pt",
     "phase_identifier.pt",
     "dqn_agent.zip",
+    "ppo_agent.zip",
+    "sac_agent.zip",
 ]
 
 TRANSFER_MATERIALS = ["srtio3", "batio3", "sige", "gan"]
