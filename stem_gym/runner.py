@@ -77,6 +77,7 @@ class EpisodeResult:
     dec: DECResult
     agent_findings: dict[str, Any] = field(default_factory=dict)
     elapsed_seconds: float = 0.0
+    seed: int = 0
 
 
 def run_episode(
@@ -223,6 +224,7 @@ def run_benchmark(
         result = run_episode(env, agent, seed=seed,
                              score_every_n_acquires=score_every_n_acquires)
         result.elapsed_seconds = time.perf_counter() - t0
+        result.seed = seed
         results.append(result)
         if verbose:
             print(

@@ -364,12 +364,19 @@ class ExperimentConfig:
     tasks: list[str] | None = None
     worlds: list[str] | None = None
     seeds: int = 5
+    seed_list: list[int] | None = None  # explicit seed list (overrides seeds)
     budget: float = 5000.0
     max_steps: int = 200
     score_every_n_acquires: int = 5
     output: str | None = None
     workers: int = 1
     save_trajectories: bool = False
+
+    def get_seed_list(self) -> list[int]:
+        """Return the explicit seed list, or range(seeds) if not set."""
+        if self.seed_list is not None:
+            return self.seed_list
+        return list(range(self.seeds))
 
 
 def load_config(path: str) -> ExperimentConfig:
@@ -404,7 +411,7 @@ def _serialize_result(
     episodes = []
     for i, r in enumerate(bench.episode_results):
         ep = {
-            "seed": i,
+            "seed": r.seed,
             "dec_auc": round(r.dec.auc, 6),
             "final_score": round(r.final_score, 6),
             "tiles_acquired": r.tiles_acquired,
@@ -522,7 +529,8 @@ def run_full_benchmark(
         combos = [c for i, c in enumerate(combos) if i % total_shards == shard_idx - 1]
 
     total_runs = len(combos)
-    total_episodes = total_runs * config.seeds
+    seed_list = config.get_seed_list()
+    total_episodes = total_runs * len(seed_list)
     workers = config.workers
 
     # Resume support: load existing results and skip completed combos
@@ -538,7 +546,7 @@ def run_full_benchmark(
         print(f"  Agents: {agents}")
         print(f"  Tasks:  {tasks}")
         print(f"  Worlds: {worlds}")
-        print(f"  Seeds:  {config.seeds}")
+        print(f"  Seeds:  {seed_list}")
         print(f"  Budget: {config.budget}")
         print(f"  Workers: {workers}")
         if shard:
@@ -584,7 +592,7 @@ def run_full_benchmark(
         agent = make_agent(agent_name)
         bench = run_benchmark(
             env, agent, agent_name,
-            n_seeds=config.seeds,
+            seeds=seed_list,
             score_every_n_acquires=config.score_every_n_acquires,
             verbose=verbose,
         )
@@ -640,10 +648,11 @@ def _run_full_benchmark_parallel(
         print(f"  Skipping {skipped} already-completed combinations\n")
 
     # Flatten all jobs: (agent, task, world, seed)
+    seed_list = config.get_seed_list()
     jobs = []
     for world_name, task_name, agent_name in remaining_combos:
         world_path = resolve_world(world_name)
-        for seed in range(config.seeds):
+        for seed in seed_list:
             jobs.append({
                 "agent_name": agent_name,
                 "task_name": task_name,
@@ -667,7 +676,7 @@ def _run_full_benchmark_parallel(
     completed_count = 0
     # Track which combos are fully done (all seeds collected) for incremental saves
     combo_seeds_expected = {
-        (c[2], c[1], c[0]): config.seeds for c in remaining_combos
+        (c[2], c[1], c[0]): len(seed_list) for c in remaining_combos
     }
     saved_combos: set[tuple[str, str, str]] = set()
     all_results = list(existing_results)
@@ -701,7 +710,7 @@ def _run_full_benchmark_parallel(
                 # Incremental save: when all seeds for a combo are done
                 if (
                     key not in saved_combos
-                    and len(results_by_combo.get(key, [])) >= combo_seeds_expected.get(key, config.seeds)
+                    and len(results_by_combo.get(key, [])) >= combo_seeds_expected.get(key, len(seed_list))
                 ):
                     saved_combos.add(key)
                     episodes = sorted(results_by_combo[key], key=lambda e: e["seed"])
@@ -870,6 +879,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--save-trajectories", action="store_true", default=False,
         help="Save per-step trajectory (position, action_type, dose) in results JSON",
     )
+    run_parser.add_argument(
+        "--seed-range", type=str, default=None,
+        help="Seed range 'START-END' (inclusive), e.g. '0-4' for seeds 0,1,2,3,4. "
+             "Use with --output to split runs across instances.",
+    )
 
     # -- merge command --
     merge_parser = sub.add_parser("merge", help="Merge shard result JSON files")
@@ -944,6 +958,15 @@ def cmd_run(args):
             save_trajectories=args.save_trajectories,
         )
 
+    # Parse --seed-range
+    if args.seed_range:
+        parts = args.seed_range.split("-")
+        if len(parts) != 2:
+            print("Error: --seed-range must be 'START-END' (e.g. '0-4')")
+            sys.exit(1)
+        start, end = int(parts[0]), int(parts[1])
+        config.seed_list = list(range(start, end + 1))
+
     # Validate
     if not config.worlds:
         # Default to all discovered worlds
@@ -969,7 +992,7 @@ def cmd_run(args):
 
     # Dry run
     if args.dry_run:
-        total = len(config.agents) * len(config.tasks) * len(config.worlds) * config.seeds
+        total = len(config.agents) * len(config.tasks) * len(config.worlds) * len(config.get_seed_list())
         print(f"\n  Dry-run plan:")
         print(f"    Agents: {config.agents}")
         print(f"    Tasks:  {config.tasks}")
@@ -1000,8 +1023,12 @@ def cmd_run(args):
 
 
 def cmd_merge(args):
-    """Merge multiple shard result files into one."""
-    all_results = []
+    """Merge multiple result files, combining episodes for matching combos.
+
+    When seed-sharded files have the same (agent, task, world) combos with
+    different seeds, their episodes are merged and statistics recomputed.
+    """
+    raw_results = []
     merged_config = None
 
     for input_path in args.inputs:
@@ -1009,24 +1036,63 @@ def cmd_merge(args):
             data = json.load(f)
         if merged_config is None:
             merged_config = data.get("config", {})
-        all_results.extend(data.get("results", []))
+        raw_results.extend(data.get("results", []))
 
-    # Deduplicate: if same (agent, task, world) appears in multiple shards, keep all
-    # (they should be disjoint if sharded properly)
-    if not all_results:
+    if not raw_results:
         print("  No results found in input files.")
         return
+
+    # Group by (agent, task, world) and merge episodes
+    from collections import defaultdict
+    grouped: dict[tuple[str, str, str], list[dict]] = defaultdict(list)
+    for r in raw_results:
+        key = (r["agent"], r["task"], r["world"])
+        grouped[key].append(r)
+
+    merged_results = []
+    for key, entries in grouped.items():
+        if len(entries) == 1:
+            merged_results.append(entries[0])
+        else:
+            # Merge episodes from multiple entries
+            all_episodes = []
+            for e in entries:
+                all_episodes.extend(e.get("episodes", []))
+
+            aucs = [ep["dec_auc"] for ep in all_episodes]
+            merged = {
+                "agent": key[0],
+                "task": key[1],
+                "world": key[2],
+                "n_episodes": len(all_episodes),
+                "mean_dec_auc": round(float(np.mean(aucs)), 6) if aucs else 0.0,
+                "std_dec_auc": round(float(np.std(aucs)), 6) if aucs else 0.0,
+                "mean_final_score": round(float(np.mean(
+                    [ep["final_score"] for ep in all_episodes])), 6),
+                "mean_dose_used": round(float(np.mean(
+                    [ep["total_dose_used"] for ep in all_episodes])), 1),
+                "mean_tiles": round(float(np.mean(
+                    [ep["tiles_acquired"] for ep in all_episodes])), 1),
+                "episodes": all_episodes,
+            }
+            # Carry over elapsed_seconds from first entry if present
+            if "elapsed_seconds" in entries[0]:
+                merged["elapsed_seconds"] = round(
+                    sum(e.get("elapsed_seconds", 0) for e in entries), 2)
+            merged_results.append(merged)
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
         json.dump({
             "config": merged_config or {},
-            "results": all_results,
+            "results": merged_results,
         }, f, indent=2)
 
-    print(f"  Merged {len(all_results)} result entries from {len(args.inputs)} files")
-    print(f"  Output: {args.output}")
+    n_merged = sum(1 for entries in grouped.values() if len(entries) > 1)
+    print(f"  Loaded {len(raw_results)} entries from {len(args.inputs)} files")
+    print(f"  Merged {n_merged} combos with overlapping (agent, task, world) keys")
+    print(f"  Output: {len(merged_results)} result entries -> {args.output}")
 
 
 def main():
