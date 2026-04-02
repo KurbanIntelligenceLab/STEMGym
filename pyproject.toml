@@ -27,7 +27,7 @@ dependencies = [
 
 [project.urls]
 Repository = "https://anonymous.4open.science/r/STEMGym"
-Dataset = "https://huggingface.co/datasets/stemgym-anon-2026/STEMGym"
+Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
 
 [project.optional-dependencies]
 sim = [

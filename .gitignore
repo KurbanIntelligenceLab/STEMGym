@@ -49,6 +49,9 @@ notebooks/
 # Figures (generated)
 figures/
 
+# Dataverse staging (temporary download/upload)
+.dataverse_staging/
+
 # SSH deploy keys
 scripts/vastai_deploy_key
 scripts/vastai_deploy_key.pub

@@ -6,10 +6,10 @@ Uses Stable-Baselines3 with appropriate wrappers per algorithm:
 - SAC: ContinuousSTEMWrapper (Box(2) continuous action space)
 
 Usage:
-    python scripts/train_rl.py --algo dqn
-    python scripts/train_rl.py --algo ppo --steps 50000
-    python scripts/train_rl.py --algo sac --steps 50000 --device cuda
-    python scripts/train_rl.py --algo dqn --worlds data/simulated/srtio3_clustered_easy.h5
+    python stem_gym/scripts/train_rl.py --algo dqn
+    python stem_gym/scripts/train_rl.py --algo ppo --steps 50000
+    python stem_gym/scripts/train_rl.py --algo sac --steps 50000 --device cuda
+    python stem_gym/scripts/train_rl.py --algo dqn --worlds data/simulated/srtio3_clustered_easy.h5
 """
 
 from __future__ import annotations
@@ -19,12 +19,12 @@ import sys
 from pathlib import Path
 
 # Ensure project root is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 
 def find_easy_worlds() -> list[str]:
     """Auto-discover easy world files for training."""
-    data_dir = Path(__file__).resolve().parent.parent / "data" / "simulated"
+    data_dir = Path(__file__).resolve().parent.parent.parent / "data" / "simulated"
     if not data_dir.exists():
         return []
     worlds = []
@@ -142,7 +142,7 @@ def main():
     # Find worlds
     worlds = args.worlds or find_easy_worlds()
     if not worlds:
-        print("ERROR: No world files found. Run `python scripts/download_data.py` first.")
+        print("ERROR: No world files found. Run `python stem_gym/scripts/download_data.py` first.")
         sys.exit(1)
 
     print(f"Training {args.algo.upper()} on {len(worlds)} worlds:")

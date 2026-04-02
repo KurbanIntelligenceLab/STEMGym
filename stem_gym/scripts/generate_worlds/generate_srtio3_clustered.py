@@ -11,7 +11,7 @@ bulk.  This is the simplest clustered-defect world: identical to the
 uniform SrTiO3 generator except step 3 uses weighted vacancy planting.
 
 Usage:
-    python scripts/generate_worlds/generate_srtio3_clustered.py [--difficulty easy|medium|hard]
+    python stem_gym/scripts/generate_worlds/generate_srtio3_clustered.py [--difficulty easy|medium|hard]
                                                       [--output data/simulated/srtio3_clustered.h5]
                                                       [--device cpu|gpu]
                                                       [--mp-api-key KEY]

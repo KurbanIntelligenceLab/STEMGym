@@ -170,8 +170,8 @@ class TestTraining:
             pytest.skip("Test world not generated")
 
         import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-        from train_atom_finder import (
+        sys.path.insert(0, str(Path(__file__).parent.parent / "stem_gym" / "scripts"))
+        from train_analyst import (
             TileDataset,
             train_atom_finder,
             train_defect_classifier,

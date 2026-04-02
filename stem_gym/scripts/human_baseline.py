@@ -7,7 +7,7 @@ using the same pipeline as automated agents.
 
 Usage:
     pip install gradio
-    python scripts/human_baseline_ui.py [--world data/simulated/test_world.h5] [--task defect_census] [--budget 5000]
+    python stem_gym/scripts/human_baseline.py [--world data/simulated/test_world.h5] [--task defect_census] [--budget 5000]
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 import numpy as np
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from stem_gym.envs.stem_env import STEMEnv, ActionType
 from stem_gym.metrics import compute_dec

@@ -5,12 +5,12 @@ Generates training data from HDF5 world files, trains all three models,
 and saves checkpoints.
 
 Usage:
-    python scripts/train_atom_finder.py --world data/simulated/test_world.h5 \
-                                        --output checkpoints/ \
-                                        --epochs 30
+    python stem_gym/scripts/train_analyst.py --world data/simulated/test_world.h5 \
+                                             --output checkpoints/ \
+                                             --epochs 30
 
 For multi-world training:
-    python scripts/train_atom_finder.py \
+    python stem_gym/scripts/train_analyst.py \
         --world data/simulated/srtio3_clustered_easy.h5 \
         --world data/simulated/batio3_interface_easy.h5 \
         --world data/simulated/sige_gradient_clustered_easy.h5 \

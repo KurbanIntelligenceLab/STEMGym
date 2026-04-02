@@ -22,16 +22,16 @@ Requires Python >= 3.10.
 Download the simulated worlds and model checkpoints from Hugging Face:
 
 ```bash
-python scripts/download_data.py              # everything (worlds + checkpoints + transfer)
-python scripts/download_data.py --worlds     # only HDF5 worlds
-python scripts/download_data.py --checkpoints # main checkpoints + DQN
-python scripts/download_data.py --transfer   # transfer-learning checkpoints (~388 MB)
+python stem_gym/scripts/download_data.py              # everything (worlds + checkpoints + transfer)
+python stem_gym/scripts/download_data.py --worlds     # only HDF5 worlds
+python stem_gym/scripts/download_data.py --checkpoints # main checkpoints + DQN
+python stem_gym/scripts/download_data.py --transfer   # transfer-learning checkpoints (~388 MB)
 ```
 
 Or generate the test world locally (no GPU needed):
 
 ```bash
-python scripts/generate_worlds/generate_test_world.py
+python stem_gym/scripts/generate_worlds/generate_test_world.py
 ```
 
 ## Quick Start
@@ -84,20 +84,20 @@ Run `stemgym list agents` for the full list (41 agents including VLM, ablation, 
 ## Project Structure
 
 ```
-stem_gym/          Core package
-  envs/            Gymnasium environment + HDF5 world
-  agents/          Multi-agent system (Navigator, Analyst, Planner)
-  baselines/       Baseline agents (Random, Raster, GP-UCB, SingleBO, DQN, VLM)
-  tasks/           Task definitions and scoring
-  metrics.py       DEC curve computation
-  runner.py        Episode and benchmark execution
-experiments/       Configs and CLI runner
-scripts/           Data download, model training, human baseline UI
-  generate_worlds/ World-generation scripts (abTEM simulation)
-building_utils/    Internal analysis and cloud deployment tooling
-data/              Simulated worlds (HDF5)
-checkpoints/       Trained neural model weights
-tests/             Test suite
+stem_gym/            Core package
+  envs/              Gymnasium environment + HDF5 world
+  agents/            Multi-agent system (Navigator, Analyst, Planner)
+  baselines/         Baseline agents (Random, Raster, GP-UCB, SingleBO, DQN, VLM)
+  tasks/             Task definitions and scoring
+  scripts/           Data download, model training, human baseline UI
+    generate_worlds/ World-generation scripts (abTEM simulation)
+  metrics.py         DEC curve computation
+  runner.py          Episode and benchmark execution
+experiments/         Configs and CLI runner
+building_utils/      Internal analysis and cloud deployment tooling
+data/                Simulated worlds (HDF5)
+checkpoints/         Trained neural model weights
+tests/               Test suite
 ```
 
 ## License

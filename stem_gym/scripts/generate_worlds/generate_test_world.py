@@ -6,7 +6,7 @@ and substitutions. Produces ground truth labels compatible with the
 World class.
 
 Usage:
-    python scripts/generate_worlds/generate_test_world.py [--output data/simulated/test_world.h5]
+    python stem_gym/scripts/generate_worlds/generate_test_world.py [--output data/simulated/test_world.h5]
 """
 
 from __future__ import annotations

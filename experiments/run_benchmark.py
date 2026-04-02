@@ -971,7 +971,7 @@ def cmd_run(args):
     if not config.worlds:
         # Default to all discovered worlds
         if not WORLD_REGISTRY:
-            print("Error: No world files found. Generate them first with scripts/generate_worlds/")
+            print("Error: No world files found. Generate them first with stem_gym/scripts/generate_worlds/")
             sys.exit(1)
         config.worlds = list(WORLD_REGISTRY.keys())
 

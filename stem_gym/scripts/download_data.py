@@ -2,11 +2,11 @@
 """Download STEMGym data and model checkpoints from Hugging Face.
 
 Usage:
-    python scripts/download_data.py              # download everything
-    python scripts/download_data.py --worlds     # only HDF5 worlds
-    python scripts/download_data.py --checkpoints # only model checkpoints
-    python scripts/download_data.py --transfer   # only transfer checkpoints
-    python scripts/download_data.py --test-only  # only test_world.h5 (minimal)
+    python stem_gym/scripts/download_data.py              # download everything
+    python stem_gym/scripts/download_data.py --worlds     # only HDF5 worlds
+    python stem_gym/scripts/download_data.py --checkpoints # only model checkpoints
+    python stem_gym/scripts/download_data.py --transfer   # only transfer checkpoints
+    python stem_gym/scripts/download_data.py --test-only  # only test_world.h5 (minimal)
 """
 
 from __future__ import annotations
@@ -15,14 +15,13 @@ import argparse
 import urllib.request
 from pathlib import Path
 
-HF_DATASET_REPO = "stemgym-anon-2026/STEMGym"
+HF_DATASET_REPO = "johnpolat/STEMGym"
 HF_BASE_URL = f"https://huggingface.co/datasets/{HF_DATASET_REPO}/resolve/main"
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data" / "simulated"
 CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
 
-# Files to download: (remote_path, local_dir, filename)
 WORLD_FILES = [
     "test_world.h5",
     "srtio3_clustered_easy.h5",
@@ -129,7 +128,6 @@ def main():
     parser.add_argument("--test-only", action="store_true", help="Download only test_world.h5")
     args = parser.parse_args()
 
-    # Default: download everything
     download_all = not (args.worlds or args.checkpoints or args.transfer or args.test_only)
 
     print("STEMGym Data Downloader")

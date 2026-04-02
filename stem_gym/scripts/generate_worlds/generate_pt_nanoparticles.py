@@ -69,7 +69,7 @@ Electron optics (shared benchmark parameters):
     0.05 Å potential sampling, 1.0 Å slice thickness, PRISM
 
 Usage:
-    python scripts/generate_worlds/generate_pt_nanoparticles.py \
+    python stem_gym/scripts/generate_worlds/generate_pt_nanoparticles.py \
         [--difficulty easy|medium|hard] \
         [--output data/simulated/pt_nanoparticles.h5] \
         [--device cpu|gpu] [--seed 42]
