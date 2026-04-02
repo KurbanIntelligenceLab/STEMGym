@@ -148,10 +148,10 @@ chmod 600 /root/.ssh/id_ed25519
 ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
 DKEOF
     )
-    CLONE_CMD='git clone git@github.com:KurbanIntelligenceLab/STEMGym.git STEMGym'
+    CLONE_CMD='git clone git@github.com:anonymous/STEMGym.git STEMGym'
 else
     DEPLOY_KEY_BLOCK='echo "No deploy key — using HTTPS clone"'
-    CLONE_CMD='git clone https://github.com/KurbanIntelligenceLab/STEMGym.git STEMGym'
+    CLONE_CMD='git clone https://github.com/anonymous/STEMGym.git STEMGym'
 fi
 
 ENV_BLOCK=""

@@ -40,7 +40,7 @@ python scripts/download_data.py 2>&1 | tee /workspace/download.log
 # Download replay_world.h5 separately (not in standard download script)
 REPLAY_DIR="data/replay"
 REPLAY_FILE="$REPLAY_DIR/replay_world.h5"
-HF_BASE="https://huggingface.co/datasets/johnpolat/STEMGym/resolve/main"
+HF_BASE="https://huggingface.co/datasets/stemgym-anon-2026/STEMGym/resolve/main"
 if [[ ! -f "$REPLAY_FILE" ]]; then
     echo "=== Downloading replay_world.h5 ==="
     mkdir -p "$REPLAY_DIR"

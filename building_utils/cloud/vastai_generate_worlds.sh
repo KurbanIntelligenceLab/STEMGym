@@ -105,7 +105,7 @@ chmod 600 /root/.ssh/id_ed25519
 ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null
 
 # --- Clone repository ---
-git clone git@github.com:KurbanIntelligenceLab/STEMGym.git /workspace/STEMGym
+git clone git@github.com:anonymous/STEMGym.git /workspace/STEMGym
 
 # --- Install dependencies ---
 pip install cupy-cuda12x
@@ -357,5 +357,5 @@ echo "  1. Verify files with: python -c \"import h5py; f=h5py.File('data/simulat
 echo "  2. Upload to HuggingFace:"
 for f in "${EXPECTED_FILES[@]}"; do
     NAME="${f%.h5}"
-    echo "     huggingface-cli upload johnpolat/STEMGym data/simulated/$f worlds/$f --repo-type=dataset"
+    echo "     huggingface-cli upload stemgym-anon-2026/STEMGym data/simulated/$f worlds/$f --repo-type=dataset"
 done

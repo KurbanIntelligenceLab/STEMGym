@@ -10,10 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    {name = "Can Polat", email = "canpolat@tamu.edu"},
-    {name = "Erchin Serpedin"},
-    {name = "Mustafa Kurban"},
-    {name = "Hasan Kurban"},
+    {name = "Anonymous"},
 ]
 
 dependencies = [
@@ -29,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
-Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
+Repository = "https://anonymous.4open.science/r/STEMGym"
+Dataset = "https://huggingface.co/datasets/stemgym-anon-2026/STEMGym"
 
 [project.optional-dependencies]
 sim = [

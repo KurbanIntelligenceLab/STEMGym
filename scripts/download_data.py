@@ -15,7 +15,7 @@ import argparse
 import urllib.request
 from pathlib import Path
 
-HF_DATASET_REPO = "johnpolat/STEMGym"
+HF_DATASET_REPO = "stemgym-anon-2026/STEMGym"
 HF_BASE_URL = f"https://huggingface.co/datasets/{HF_DATASET_REPO}/resolve/main"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

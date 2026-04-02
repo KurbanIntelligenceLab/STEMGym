@@ -106,17 +106,8 @@ Code: MIT. Data: CC-BY-4.0.
 
 ## Authors
 
-- **Can Polat** — Texas A&M University, USA
-- **Erchin Serpedin** — Texas A&M University, USA
-- **Mustafa Kurban** (corresponding) — Ankara University, Turkey & Texas A&M University at Qatar
-- **Hasan Kurban** (corresponding) — Hamad Bin Khalifa University, Qatar
+Anonymous (double-blind review)
 
 ## Citation
 
-```bibtex
-@article{stemgym2026,
-  title={{STEMGym}: A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Transmission Electron Microscopy},
-  author={Polat, Can and Serpedin, Erchin and Kurban, Mustafa and Kurban, Hasan},
-  year={2026}
-}
-```
+Citation will be provided after review.

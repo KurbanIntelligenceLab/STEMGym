@@ -14,6 +14,7 @@ build/
 venv/
 env/
 building_utils/
+
 # Testing
 .pytest_cache/
 .coverage
@@ -31,13 +32,9 @@ coverage.xml
 Thumbs.db
 
 # Project-specific: large files hosted on Hugging Face
-data/simulated/*.h5
-data/simulated/*.npz
-data/simulated/.cache/
-data/replay/*.h5
-data/replay/*.dm4
-data/replay/downloads/
+data/
 checkpoints/
+building_utils/
 
 # Results (generated, not tracked)
 results/
