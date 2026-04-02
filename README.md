@@ -4,6 +4,8 @@ A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Tran
 
 Agents navigate a simulated specimen under a limited electron dose budget to characterize defects, phases, and atomic structure. Performance is measured via Dose-Efficiency Curves (DEC-AUC).
 
+**Dataset & Checkpoints:** [https://huggingface.co/datasets/johnpolat/STEMGym](https://huggingface.co/datasets/johnpolat/STEMGym)
+
 ## Installation
 
 ```bash
