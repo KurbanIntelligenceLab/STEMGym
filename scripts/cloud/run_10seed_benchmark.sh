@@ -40,7 +40,7 @@ if [ -d "$REPO_DIR" ]; then
     git pull
 else
     cd "$WORKSPACE"
-    git clone git@github.com:KurbanIntelligenceLab/STEMGym.git
+    git clone git@github.com:anonymous/STEMGym.git
     cd "$REPO_DIR"
 fi
 
