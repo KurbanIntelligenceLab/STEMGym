@@ -203,8 +203,8 @@ class TestTraining:
             pytest.skip("Test world not generated")
 
         import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-        from train_atom_finder import TileDataset
+        sys.path.insert(0, str(Path(__file__).parent.parent / "stem_gym" / "scripts"))
+        from train_analyst import TileDataset
 
         ds = TileDataset([TEST_WORLD], augment=False)
         assert len(ds) > 0
@@ -265,8 +265,8 @@ class TestTraining:
         dataset = trained_models["dataset"]
 
         import sys
-        sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
-        from train_atom_finder import DefectPatchDataset
+        sys.path.insert(0, str(Path(__file__).parent.parent / "stem_gym" / "scripts"))
+        from train_analyst import DefectPatchDataset
 
         patch_ds = DefectPatchDataset(dataset, augment=False)
         if len(patch_ds) < 10:

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    {name = "Anonymous"},
+    {name = "Can Polat", email = "can.polat0@yahoo.com"},
 ]
 
 dependencies = [
@@ -26,7 +26,7 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://anonymous.4open.science/r/STEMGym"
+Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
 Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
 
 [project.optional-dependencies]
