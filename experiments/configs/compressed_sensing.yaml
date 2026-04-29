@@ -1,0 +1,29 @@
+# Compressed-sensing baseline (Candès et al. 2006-style). Random tile
+# masking + biharmonic inpainting + analyst inference.
+# 6 CS variants x 2 tasks x 3 worlds x 10 seeds = 360 episodes.
+
+name: compressed_sensing
+
+agents:
+  - cs_10pct
+  - cs_20pct
+  - cs_30pct
+  - cs_10pct_equipped
+  - cs_20pct_equipped
+  - cs_30pct_equipped
+
+tasks:
+  - defect_census
+  - phase_mapping
+
+worlds:
+  - srtio3_clustered_easy
+  - batio3_interface_easy
+  - sige_gradient_clustered_easy
+
+seeds: 10
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/compressed_sensing.json

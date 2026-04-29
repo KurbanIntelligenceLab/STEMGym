@@ -99,6 +99,46 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "class": "stem_gym.baselines.equipped_baselines.SingleBOEquippedAgent",
         "description": "Joint BO over (x,y,zoom,dwell) + trained Analyst",
     },
+    "kalinin_gp_bo": {
+        "class": "stem_gym.baselines.kalinin_gp_bo.KalininGPBOAgent",
+        "description": "Ziatdinov 2022 / Kalinin 2023 GP-BO baseline (intensity + atom-position features, no analyst)",
+        "kwargs": {"initial_random": 4},
+    },
+    "kalinin_gp_bo_equipped": {
+        "class": "stem_gym.baselines.kalinin_gp_bo.KalininGPBOEquippedAgent",
+        "description": "Ziatdinov 2022 / Kalinin 2023 GP-BO baseline + trained Analyst",
+        "kwargs": {"initial_random": 4},
+    },
+    "cs_10pct": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingAgent",
+        "description": "Compressed sensing (10% random tile coverage + biharmonic inpainting, SimpleAnalyst)",
+        "kwargs": {"coverage_frac": 0.10},
+    },
+    "cs_20pct": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingAgent",
+        "description": "Compressed sensing (20% random tile coverage + biharmonic inpainting, SimpleAnalyst)",
+        "kwargs": {"coverage_frac": 0.20},
+    },
+    "cs_30pct": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingAgent",
+        "description": "Compressed sensing (30% random tile coverage + biharmonic inpainting, SimpleAnalyst)",
+        "kwargs": {"coverage_frac": 0.30},
+    },
+    "cs_10pct_equipped": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingEquippedAgent",
+        "description": "Compressed sensing (10% coverage) + trained Analyst",
+        "kwargs": {"coverage_frac": 0.10},
+    },
+    "cs_20pct_equipped": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingEquippedAgent",
+        "description": "Compressed sensing (20% coverage) + trained Analyst",
+        "kwargs": {"coverage_frac": 0.20},
+    },
+    "cs_30pct_equipped": {
+        "class": "stem_gym.baselines.compressed_sensing.CompressedSensingEquippedAgent",
+        "description": "Compressed sensing (30% coverage) + trained Analyst",
+        "kwargs": {"coverage_frac": 0.30},
+    },
     "raster_vlm_claude": {
         "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
         "description": "Raster + Claude Haiku 4.5 VLM analyst",

@@ -1,0 +1,41 @@
+# VLM re-run with chain-of-thought prompting + JSON parse retries +
+# per-call diagnostics. Same agent/world/task/seed scope as the original
+# vlm_comparison.yaml so we can compare the two head-to-head as a
+# CoT-vs-no-CoT ablation. Requires OPENROUTER_API_KEY.
+#
+# 12 agents x 3 tasks x 5 worlds x 5 seeds = 900 episodes.
+
+name: vlm_cot_retry
+
+agents:
+  - raster
+  - raster_equipped
+  - raster_vlm_claude
+  - raster_vlm_gpt5
+  - raster_vlm_llama
+  - raster_vlm_gemini
+  - gp_ucb
+  - gp_ucb_equipped
+  - gp_ucb_vlm_claude
+  - gp_ucb_vlm_gpt5
+  - gp_ucb_vlm_llama
+  - gp_ucb_vlm_gemini
+
+tasks:
+  - defect_census
+  - phase_mapping
+  - targeted
+
+worlds:
+  - srtio3_clustered_easy
+  - batio3_interface_easy
+  - sige_gradient_clustered_easy
+  - gan_easy
+  - pt_nanoparticles_easy
+
+seeds: 5
+budget: 5000.0
+max_steps: 200
+score_every_n_acquires: 5
+
+output: results/vlm_cot_retry.json

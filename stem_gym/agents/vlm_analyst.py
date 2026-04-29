@@ -19,11 +19,16 @@ import io
 import json
 import logging
 import os
+import time
 from typing import Any
 
 import numpy as np
 
 from stem_gym.agents.simple_analyst import AnalysisResult
+
+# H6: retry budget for transient JSON parse failures.
+_VLM_RETRY_ATTEMPTS = 3
+_VLM_RETRY_SLEEP_S = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +57,14 @@ than their neighbors (different atomic number)
 Analyze the tile and respond with ONLY a JSON object (no markdown, no explanation)."""
 
 _USER_PROMPT = """\
-Analyze this HAADF-STEM tile image. Return a JSON object with:
+Analyze this HAADF-STEM tile image.
+
+First, reason step by step about what you see: identify the atomic lattice, \
+estimate the column spacing, and note any visible defects (missing atoms, \
+unusually bright/dim atoms, regions of different crystal structure). Keep \
+this reasoning concise (2-4 sentences).
+
+Then emit a single JSON object with the findings:
 {{
   "n_atoms": <estimated number of atomic columns visible>,
   "defects": [
@@ -64,7 +76,9 @@ Analyze this HAADF-STEM tile image. Return a JSON object with:
 }}
 
 If no defects are visible, return an empty defects array.
-Focus on clear, unambiguous defects only — do not over-report."""
+Focus on clear, unambiguous defects only — do not over-report.
+Wrap the JSON in a single ```json``` code block at the end of your response \
+so it can be parsed reliably."""
 
 
 def _tile_to_png_base64(tile: np.ndarray) -> str:
@@ -86,8 +100,51 @@ def _tile_to_png_base64(tile: np.ndarray) -> str:
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
+def _extract_json(text: str) -> dict:
+    """Extract a JSON object from the VLM response.
+
+    Handles three cases (in order of preference):
+    1. A fenced ```json...``` block (preferred for CoT responses).
+    2. A bare ```...``` fenced block.
+    3. The last balanced {...} substring in the text.
+
+    Raises json.JSONDecodeError if no valid JSON object can be extracted.
+    """
+    text = text.strip()
+
+    # 1. Fenced json block, last occurrence
+    json_fence_marker = "```json"
+    if json_fence_marker in text:
+        after = text.rsplit(json_fence_marker, 1)[1]
+        body = after.split("```", 1)[0].strip()
+        return json.loads(body)
+
+    # 2. Generic fenced block
+    if "```" in text:
+        parts = text.split("```")
+        # Take the last fenced segment
+        for candidate in reversed(parts[1:-1] + (parts[-1:] if len(parts) > 1 else [])):
+            stripped = candidate.strip()
+            if stripped.startswith("{") and stripped.endswith("}"):
+                return json.loads(stripped)
+
+    # 3. Last balanced {...} substring
+    last_open = text.rfind("{")
+    last_close = text.rfind("}")
+    if last_open != -1 and last_close > last_open:
+        return json.loads(text[last_open : last_close + 1])
+
+    # No JSON found — raise the same exception type the retry loop watches for
+    raise json.JSONDecodeError("No JSON object found in VLM response", text, 0)
+
+
 def _call_openrouter(image_b64: str, model: str) -> dict:
-    """Call a VLM via OpenRouter API."""
+    """Call a VLM via OpenRouter API and parse the response.
+
+    Raises ``json.JSONDecodeError`` if the response cannot be parsed; the
+    caller (``VLMAnalyst._call_vlm``) handles retries up to
+    ``_VLM_RETRY_ATTEMPTS`` before falling back to an empty findings dict.
+    """
     import openai
 
     api_key = os.environ.get("OPENROUTER_API_KEY")
@@ -120,14 +177,8 @@ def _call_openrouter(image_b64: str, model: str) -> dict:
         ],
     )
 
-    text = response.choices[0].message.content.strip()
-    # Strip markdown code fences if present
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1]
-    if text.endswith("```"):
-        text = text.rsplit("```", 1)[0]
-    text = text.strip()
-    return json.loads(text)
+    text = response.choices[0].message.content
+    return _extract_json(text)
 
 
 class VLMAnalyst:
@@ -162,6 +213,8 @@ class VLMAnalyst:
 
         self._call_count = 0
         self._error_count = 0
+        # H6: per-call diagnostics for parse-failure reporting (V23).
+        self._diagnostics: list[dict[str, Any]] = []
 
     def reset(self) -> None:
         self._tile_results.clear()
@@ -172,17 +225,74 @@ class VLMAnalyst:
         self._phase_labels.clear()
         self._call_count = 0
         self._error_count = 0
+        self._diagnostics.clear()
 
     def _call_vlm(self, tile: np.ndarray) -> dict:
-        """Call the VLM API and return parsed response."""
+        """Call the VLM API with up to ``_VLM_RETRY_ATTEMPTS`` retries.
+
+        Retries are triggered only by ``json.JSONDecodeError`` (the
+        I/O+parse boundary). Other exceptions short-circuit to the empty
+        findings fallback. Per-attempt outcomes are appended to
+        ``self._diagnostics`` for downstream parse-failure reporting.
+        """
         image_b64 = _tile_to_png_base64(tile)
 
-        try:
-            return _call_openrouter(image_b64, self.model)
-        except Exception as e:
-            self._error_count += 1
-            logger.warning(f"VLM call failed ({self.provider}/{self.model}): {e}")
-            return {"n_atoms": 0, "defects": [], "phase": 0, "confidence": 0.0}
+        last_excerpt = ""
+        for attempt in range(1, _VLM_RETRY_ATTEMPTS + 1):
+            try:
+                result = _call_openrouter(image_b64, self.model)
+                self._diagnostics.append(
+                    {
+                        "model": self.model,
+                        "attempt": attempt,
+                        "success": True,
+                        "parse_failure_reason": None,
+                        "response_excerpt": "",
+                    }
+                )
+                return result
+            except json.JSONDecodeError as e:
+                last_excerpt = (e.doc or "")[:200]
+                self._diagnostics.append(
+                    {
+                        "model": self.model,
+                        "attempt": attempt,
+                        "success": False,
+                        "parse_failure_reason": f"JSONDecodeError: {e.msg}",
+                        "response_excerpt": last_excerpt,
+                    }
+                )
+                if attempt < _VLM_RETRY_ATTEMPTS:
+                    time.sleep(_VLM_RETRY_SLEEP_S)
+                continue
+            except Exception as e:
+                self._error_count += 1
+                self._diagnostics.append(
+                    {
+                        "model": self.model,
+                        "attempt": attempt,
+                        "success": False,
+                        "parse_failure_reason": f"{type(e).__name__}: {e}",
+                        "response_excerpt": "",
+                    }
+                )
+                logger.warning(
+                    f"VLM call failed ({self.provider}/{self.model}): {e}"
+                )
+                return {
+                    "n_atoms": 0,
+                    "defects": [],
+                    "phase": 0,
+                    "confidence": 0.0,
+                }
+
+        # All retry attempts exhausted via JSONDecodeError
+        self._error_count += 1
+        logger.warning(
+            f"VLM JSON parse failed after {_VLM_RETRY_ATTEMPTS} attempts "
+            f"({self.provider}/{self.model}); last excerpt: {last_excerpt!r}"
+        )
+        return {"n_atoms": 0, "defects": [], "phase": 0, "confidence": 0.0}
 
     def analyze_tile(
         self,
@@ -311,4 +421,44 @@ class VLMAnalyst:
         return {
             key: label
             for key, label in zip(self._phase_tile_keys, self._phase_labels)
+        }
+
+    def get_diagnostics(self) -> dict[str, Any]:
+        """Per-VLM parse-failure diagnostics aggregated over the episode.
+
+        Used by H6/V23 to populate the VLM diagnostics table in Appendix O.
+        ``successful_calls`` counts unique calls that ultimately succeeded
+        (one per ``analyze_tile`` invocation that produced a valid JSON);
+        ``parse_failures`` counts attempts that raised ``JSONDecodeError``;
+        ``api_errors`` counts non-parse exceptions.
+        """
+        successful_calls = sum(1 for d in self._diagnostics if d["success"])
+        parse_failures = sum(
+            1
+            for d in self._diagnostics
+            if not d["success"]
+            and d["parse_failure_reason"]
+            and d["parse_failure_reason"].startswith("JSONDecodeError")
+        )
+        api_errors = sum(
+            1
+            for d in self._diagnostics
+            if not d["success"]
+            and d["parse_failure_reason"]
+            and not d["parse_failure_reason"].startswith("JSONDecodeError")
+        )
+        retry_distribution: dict[int, int] = {}
+        for d in self._diagnostics:
+            if d["success"]:
+                retry_distribution[d["attempt"]] = (
+                    retry_distribution.get(d["attempt"], 0) + 1
+                )
+        return {
+            "model": self.model,
+            "total_attempts": len(self._diagnostics),
+            "successful_calls": successful_calls,
+            "parse_failures": parse_failures,
+            "api_errors": api_errors,
+            "retry_distribution": retry_distribution,
+            "raw_log": list(self._diagnostics),
         }

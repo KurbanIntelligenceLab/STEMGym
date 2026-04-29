@@ -12,6 +12,8 @@ from stem_gym.baselines.random_agent import RandomAgent
 from stem_gym.baselines.raster_scan import RasterAgent
 from stem_gym.baselines.gp_ucb import GPUCBAgent
 from stem_gym.baselines.single_bo import SingleBOAgent
+from stem_gym.baselines.kalinin_gp_bo import KalininGPBOAgent
+from stem_gym.baselines.compressed_sensing import CompressedSensingAgent
 from stem_gym.agents.simple_analyst import SimpleAnalyst
 from stem_gym.envs.stem_env import STEMEnv, ActionType
 from stem_gym.tasks import DummyTask
@@ -81,6 +83,8 @@ class TestAgentProtocol:
         ("raster", RasterAgent),
         ("gp_ucb", GPUCBAgent),
         ("single_bo", SingleBOAgent),
+        ("kalinin_gp_bo", KalininGPBOAgent),
+        ("compressed_sensing", CompressedSensingAgent),
     ])
     def agent_cls(self, request):
         return request.param
@@ -90,10 +94,10 @@ class TestAgentProtocol:
         name, cls = agent_cls
         env = STEMEnv(world_path, total_budget=5000.0, max_steps=100)
 
-        if name == "gp_ucb":
+        if name in ("gp_ucb", "single_bo", "kalinin_gp_bo"):
             agent = cls(seed=42, initial_random=3)
-        elif name == "single_bo":
-            agent = cls(seed=42, initial_random=3)
+        elif name == "compressed_sensing":
+            agent = cls(seed=42, coverage_frac=0.2)
         else:
             agent = cls(seed=42)
 
