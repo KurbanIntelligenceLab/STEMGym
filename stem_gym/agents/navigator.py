@@ -171,7 +171,9 @@ class Navigator:
         from botorch.fit import fit_gpytorch_mll
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Tiny GP fit; CPU avoids GPU-arch mismatches (e.g. RTX 5090 sm_120
+        # with PyTorch 2.5.x). Negligible perf cost vs analyst inference.
+        _device = "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 

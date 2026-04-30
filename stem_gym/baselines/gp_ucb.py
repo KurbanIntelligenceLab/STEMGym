@@ -77,7 +77,10 @@ class GPUCBAgent(Agent):
         from botorch.fit import fit_gpytorch_mll
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        _device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Tiny GP (≤200 points × 2 features); CPU avoids GPU-arch
+        # mismatches (e.g., RTX 5090 sm_120 with PyTorch 2.5.x). The
+        # negligible CPU overhead is dwarfed by analyst inference cost.
+        _device = "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 

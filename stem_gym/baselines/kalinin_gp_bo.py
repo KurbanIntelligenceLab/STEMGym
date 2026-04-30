@@ -113,7 +113,9 @@ class KalininGPBOAgent(Agent):
         from botorch.models import SingleTaskGP
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Tiny GP (≤200 points × 2 features); CPU avoids GPU-arch
+        # mismatches (e.g., RTX 5090 sm_120 with PyTorch 2.5.x).
+        device = "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=device)
         train_Y = torch.tensor(
             self._Y, dtype=torch.float64, device=device
