@@ -46,6 +46,10 @@ human = [
 rl = [
     "stable-baselines3>=2.0",
 ]
+vlm = [
+    "openai>=1.0",
+    "pillow>=10.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

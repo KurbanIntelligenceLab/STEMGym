@@ -47,60 +47,40 @@ def _inpaint_tile_from_neighbors(
     acquired: dict[tuple[int, int], np.ndarray],
     tile_shape: tuple[int, int],
 ) -> np.ndarray:
-    """Reconstruct a single missing 128x128 tile via biharmonic inpaint
-    over a 3x3 patch built from its acquired neighbors.
+    """Reconstruct a single missing 128x128 tile by averaging its
+    acquired 8-neighborhood.
 
-    Per-tile inpainting (not full-overview) keeps the sparse-matrix
-    factorisation tractable: a 384x384 patch is two orders of magnitude
-    cheaper than a 1024x1024 grid where most cells are masked.
+    Earlier versions used skimage.restoration.inpaint_biharmonic over a
+    3x3 patch; the per-tile sparse factorisation is correct but ~1-5s
+    each, which scales to ~20+ hours for the full 36-combo CS sweep.
+    Mean-of-neighbors is two orders of magnitude faster and still
+    represents the compressed-sensing paradigm: missing tiles are
+    filled from the acquired subset rather than re-acquired. Compared
+    to true TV inpainting, the boundary detail is smoother (no edge
+    preservation), which we acknowledge in the paper.
 
-    Falls back to zero-fill if no neighbors are acquired.
+    Falls back to zero-fill if no neighbor is acquired.
     """
-    from skimage.restoration import inpaint_biharmonic
-
     tr, tc = target_rc
     th, tw = tile_shape
     rows, cols = grid_shape
 
-    patch = np.zeros((3 * th, 3 * tw), dtype=np.float32)
-    mask = np.ones((3 * th, 3 * tw), dtype=bool)
-
-    has_any_neighbor = False
+    neighbors: list[np.ndarray] = []
     for dr in (-1, 0, 1):
         for dc in (-1, 0, 1):
-            r = tr + dr
-            c = tc + dc
-            if r < 0 or r >= rows or c < 0 or c >= cols:
-                continue
-            if (r, c) not in acquired:
-                continue
-            r0 = (dr + 1) * th
-            c0 = (dc + 1) * tw
-            patch[r0 : r0 + th, c0 : c0 + tw] = acquired[(r, c)]
-            mask[r0 : r0 + th, c0 : c0 + tw] = False
-            has_any_neighbor = True
-
-    if not has_any_neighbor:
-        return np.zeros((th, tw), dtype=np.float32)
-
-    # Mark the centre tile as the only thing we want to inpaint.
-    mask[:] = True
-    mask[th : 2 * th, tw : 2 * tw] = True
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
-            r = tr + dr
-            c = tc + dc
             if (dr, dc) == (0, 0):
                 continue
+            r = tr + dr
+            c = tc + dc
             if r < 0 or r >= rows or c < 0 or c >= cols:
                 continue
             if (r, c) in acquired:
-                r0 = (dr + 1) * th
-                c0 = (dc + 1) * tw
-                mask[r0 : r0 + th, c0 : c0 + tw] = False
+                neighbors.append(acquired[(r, c)])
 
-    rec = inpaint_biharmonic(patch, mask).astype(np.float32)
-    return rec[th : 2 * th, tw : 2 * tw]
+    if not neighbors:
+        return np.zeros((th, tw), dtype=np.float32)
+
+    return np.mean(np.stack(neighbors), axis=0).astype(np.float32)
 
 
 class CompressedSensingAgent(Agent):
