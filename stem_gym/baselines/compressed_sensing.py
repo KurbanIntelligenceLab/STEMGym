@@ -41,20 +41,66 @@ from stem_gym.baselines import Agent
 from stem_gym.envs.stem_env import ActionType
 
 
-def _inpaint_overview(
-    overview: np.ndarray, mask: np.ndarray
+def _inpaint_tile_from_neighbors(
+    target_rc: tuple[int, int],
+    grid_shape: tuple[int, int],
+    acquired: dict[tuple[int, int], np.ndarray],
+    tile_shape: tuple[int, int],
 ) -> np.ndarray:
-    """Biharmonic inpaint of masked regions in a 2D HAADF overview.
+    """Reconstruct a single missing 128x128 tile via biharmonic inpaint
+    over a 3x3 patch built from its acquired neighbors.
 
-    Mask is True where pixels are missing (need inpainting).
+    Per-tile inpainting (not full-overview) keeps the sparse-matrix
+    factorisation tractable: a 384x384 patch is two orders of magnitude
+    cheaper than a 1024x1024 grid where most cells are masked.
+
+    Falls back to zero-fill if no neighbors are acquired.
     """
     from skimage.restoration import inpaint_biharmonic
 
-    if not mask.any():
-        return overview.copy()
-    if mask.all():
-        return np.zeros_like(overview)
-    return inpaint_biharmonic(overview, mask).astype(np.float32)
+    tr, tc = target_rc
+    th, tw = tile_shape
+    rows, cols = grid_shape
+
+    patch = np.zeros((3 * th, 3 * tw), dtype=np.float32)
+    mask = np.ones((3 * th, 3 * tw), dtype=bool)
+
+    has_any_neighbor = False
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            r = tr + dr
+            c = tc + dc
+            if r < 0 or r >= rows or c < 0 or c >= cols:
+                continue
+            if (r, c) not in acquired:
+                continue
+            r0 = (dr + 1) * th
+            c0 = (dc + 1) * tw
+            patch[r0 : r0 + th, c0 : c0 + tw] = acquired[(r, c)]
+            mask[r0 : r0 + th, c0 : c0 + tw] = False
+            has_any_neighbor = True
+
+    if not has_any_neighbor:
+        return np.zeros((th, tw), dtype=np.float32)
+
+    # Mark the centre tile as the only thing we want to inpaint.
+    mask[:] = True
+    mask[th : 2 * th, tw : 2 * tw] = True
+    for dr in (-1, 0, 1):
+        for dc in (-1, 0, 1):
+            r = tr + dr
+            c = tc + dc
+            if (dr, dc) == (0, 0):
+                continue
+            if r < 0 or r >= rows or c < 0 or c >= cols:
+                continue
+            if (r, c) in acquired:
+                r0 = (dr + 1) * th
+                c0 = (dc + 1) * tw
+                mask[r0 : r0 + th, c0 : c0 + tw] = False
+
+    rec = inpaint_biharmonic(patch, mask).astype(np.float32)
+    return rec[th : 2 * th, tw : 2 * tw]
 
 
 class CompressedSensingAgent(Agent):
@@ -155,32 +201,27 @@ class CompressedSensingAgent(Agent):
     def _build_reconstructed_tiles(
         self,
     ) -> dict[tuple[int, int], np.ndarray]:
-        """Inpaint missing tiles via biharmonic interpolation over the
-        assembled overview, then re-slice into per-tile arrays."""
+        """Per-tile biharmonic inpainting from acquired neighbors.
+
+        Avoids the full-overview (rows * tile_h) x (cols * tile_w)
+        sparse factorisation that OOMs on 1024x1024 grids; instead each
+        missing tile is reconstructed from a 3x3 neighbor patch.
+        """
         if not self._acquired:
             return {}
 
-        # Infer tile shape from a sample
         sample_tile = next(iter(self._acquired.values()))
-        tile_h, tile_w = sample_tile.shape
+        tile_shape = sample_tile.shape
         rows, cols = self._grid_shape
-
-        overview = np.zeros((rows * tile_h, cols * tile_w), dtype=np.float32)
-        mask = np.ones((rows * tile_h, cols * tile_w), dtype=bool)
-        for (r, c), tile in self._acquired.items():
-            r0, c0 = r * tile_h, c * tile_w
-            overview[r0 : r0 + tile_h, c0 : c0 + tile_w] = tile
-            mask[r0 : r0 + tile_h, c0 : c0 + tile_w] = False
-
-        reconstructed = _inpaint_overview(overview, mask)
 
         out: dict[tuple[int, int], np.ndarray] = {}
         for r in range(rows):
             for c in range(cols):
                 if (r, c) in self._acquired:
                     continue
-                r0, c0 = r * tile_h, c * tile_w
-                out[(r, c)] = reconstructed[r0 : r0 + tile_h, c0 : c0 + tile_w]
+                out[(r, c)] = _inpaint_tile_from_neighbors(
+                    (r, c), self._grid_shape, self._acquired, tile_shape
+                )
         return out
 
     def _build_secondary_analyst(self):
