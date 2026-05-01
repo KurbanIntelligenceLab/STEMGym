@@ -236,3 +236,48 @@ def rank_correlation(
         kt, _ = stats.kendalltau(dec_values[mask], alt_values[mask])
         out[name] = {"spearman": float(sp), "kendall": float(kt)}
     return out
+
+
+def find_disagreements(
+    agg: dict[tuple[str, str], dict[str, float]],
+    task: str,
+) -> list[dict]:
+    """Identify agent pairs (a, b) where DEC-AUC ranks a > b but at least
+    one alternative metric ranks b > a (or vice versa).
+
+    Returns:
+        list of dicts with keys {alt_metric, agent_a, agent_b,
+        dec_auc_a, dec_auc_b, alt_a, alt_b}. Each record corresponds to
+        a single (alt_metric, ordered pair) inversion.
+    """
+    agents = sorted({a for (a, t) in agg if t == task})
+    out: list[dict] = []
+
+    for name in METRIC_NAMES:
+        if name == "dec_auc":
+            continue
+        for i, agent_a in enumerate(agents):
+            for agent_b in agents[i + 1:]:
+                m_a = agg.get((agent_a, task), {})
+                m_b = agg.get((agent_b, task), {})
+                if name not in m_a or name not in m_b:
+                    continue
+                dec_a, dec_b = m_a.get("dec_auc", 0.0), m_b.get("dec_auc", 0.0)
+                alt_a, alt_b = m_a[name], m_b[name]
+                if np.isnan(alt_a) or np.isnan(alt_b):
+                    continue
+                # Invert time_to_threshold so "higher is better" applies
+                if name == "time_to_threshold":
+                    alt_a, alt_b = -alt_a, -alt_b
+                # Disagreement: DEC-AUC and alt have opposite orderings
+                if (dec_a > dec_b and alt_a < alt_b) or (dec_a < dec_b and alt_a > alt_b):
+                    out.append({
+                        "alt_metric": name,
+                        "agent_a": agent_a,
+                        "agent_b": agent_b,
+                        "dec_auc_a": dec_a,
+                        "dec_auc_b": dec_b,
+                        "alt_a": m_a[name],
+                        "alt_b": m_b[name],
+                    })
+    return out

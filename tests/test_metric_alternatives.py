@@ -15,6 +15,7 @@ from building_utils.analysis.metric_alternatives import (
     METRIC_NAMES,
     aggregate_results,
     rank_correlation,
+    find_disagreements,
 )
 
 
@@ -247,3 +248,40 @@ class TestRankCorrelation:
         corr = rank_correlation(agg, "t")
         # Single-agent ranking is undefined; expect None or NaN
         assert corr is None or all(np.isnan(v["spearman"]) for v in corr.values())
+
+
+class TestFindDisagreements:
+    def test_perfect_agreement_yields_empty_list(self):
+        agg = {
+            ("a", "t"): {name: 0.9 for name in METRIC_NAMES},
+            ("b", "t"): {name: 0.5 for name in METRIC_NAMES},
+            ("c", "t"): {name: 0.1 for name in METRIC_NAMES},
+        }
+        # time_to_threshold is "lower better", flip it to be consistent
+        for k in agg:
+            agg[k]["time_to_threshold"] = 1.0 - agg[k]["time_to_threshold"]
+        # Inversion is handled inside find_disagreements; here we just
+        # verify that all metrics agree
+        disagreements = find_disagreements(agg, "t")
+        assert disagreements == []
+
+    def test_inversion_detected(self):
+        # DEC-AUC ranks a > b, but final_accuracy ranks b > a
+        agg = {
+            ("a", "t"): {"dec_auc": 0.9, "final_accuracy": 0.1, "early_weighted_auc": 0.9,
+                          "late_weighted_auc": 0.9, "half_budget_auc": 0.9,
+                          "time_to_threshold": 0.1},
+            ("b", "t"): {"dec_auc": 0.1, "final_accuracy": 0.9, "early_weighted_auc": 0.1,
+                          "late_weighted_auc": 0.1, "half_budget_auc": 0.1,
+                          "time_to_threshold": 0.9},
+        }
+        disagreements = find_disagreements(agg, "t")
+        # Expect at least one disagreement record for final_accuracy
+        finals = [d for d in disagreements if d["alt_metric"] == "final_accuracy"]
+        assert len(finals) == 1
+        # Record contains both agents and their values
+        d = finals[0]
+        assert {d["agent_a"], d["agent_b"]} == {"a", "b"}
+        # No disagreement for the metrics that agree with DEC-AUC
+        for ag_metric in ("early_weighted_auc", "late_weighted_auc", "half_budget_auc"):
+            assert not any(d["alt_metric"] == ag_metric for d in disagreements)
