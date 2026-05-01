@@ -17,6 +17,8 @@ Usage:
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 import numpy as np
 
 
@@ -135,3 +137,60 @@ def compute_all_metrics(
         "late_weighted_auc": late_weighted_auc(scores, dose_fractions),
         "half_budget_auc": half_budget_auc(scores, dose_fractions),
     }
+
+
+def aggregate_results(
+    results: list[dict],
+) -> dict[tuple[str, str], dict[str, float]]:
+    """Aggregate per-episode metrics across worlds and seeds, grouped by
+    (agent, task).
+
+    Args:
+        results: list of combo dicts as found in `results/*.json` under the
+            top-level `"results"` key. Each combo has `agent`, `task`,
+            `world`, and `episodes` fields. Each episode has at minimum
+            `seed`, `dec_auc`, `final_score`, and (preferably)
+            `dec_dose_fractions` + `dec_scores` arrays for trajectory
+            metrics.
+
+    Returns:
+        dict mapping (agent, task) -> {metric_name: mean value across all
+        episodes for that pair}. Trajectory-dependent metrics fall back to
+        NaN for episodes missing `dec_dose_fractions`/`dec_scores`.
+    """
+    per_pair = defaultdict(lambda: defaultdict(list))
+    for combo in results:
+        agent = combo.get("agent")
+        task = combo.get("task")
+        episodes = combo.get("episodes") or []
+        if not episodes:
+            continue
+        for ep in episodes:
+            f = ep.get("dec_dose_fractions")
+            s = ep.get("dec_scores")
+            if f is not None and s is not None and len(s) > 0:
+                arr_f = np.asarray(f, dtype=float)
+                arr_s = np.asarray(s, dtype=float)
+                metrics = compute_all_metrics(arr_s, arr_f)
+                # Prefer authoritative top-level fields when present so we
+                # round-trip exactly with the runner's own computation.
+                if "dec_auc" in ep:
+                    metrics["dec_auc"] = float(ep["dec_auc"])
+                if "final_score" in ep:
+                    metrics["final_accuracy"] = float(ep["final_score"])
+            else:
+                # Fall back to top-level fields, NaN for trajectory metrics
+                metrics = {name: float("nan") for name in METRIC_NAMES}
+                metrics["dec_auc"] = float(ep.get("dec_auc", 0.0))
+                metrics["final_accuracy"] = float(ep.get("final_score", 0.0))
+            for name, value in metrics.items():
+                per_pair[(agent, task)][name].append(value)
+
+    # Reduce: nanmean per metric per (agent, task)
+    out: dict[tuple[str, str], dict[str, float]] = {}
+    for key, metric_lists in per_pair.items():
+        out[key] = {
+            name: float(np.nanmean(values)) if len(values) > 0 and not all(np.isnan(values)) else float("nan")
+            for name, values in metric_lists.items()
+        }
+    return out

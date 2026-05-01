@@ -13,6 +13,7 @@ from building_utils.analysis.metric_alternatives import (
     half_budget_auc,
     compute_all_metrics,
     METRIC_NAMES,
+    aggregate_results,
 )
 
 
@@ -134,3 +135,67 @@ class TestComputeAllMetrics:
         assert result["dec_auc"] == 0.0
         assert result["final_accuracy"] == 0.0
         assert result["time_to_threshold"] == 1.0
+
+
+class TestAggregateResults:
+    def _fake_combo(self, agent: str, task: str, world: str, episode_aucs: list[float]):
+        """Build a minimal results-JSON-shaped combo entry."""
+        episodes = []
+        for i, auc in enumerate(episode_aucs):
+            f = np.linspace(0, 1, 11).tolist()
+            # Construct a curve whose AUC is approximately `auc`: linear
+            # ramp from 0 to 2*auc (truncated at 1.0).
+            scores = [min(1.0, 2.0 * auc * x) for x in f]
+            episodes.append({
+                "seed": i,
+                "dec_auc": auc,
+                "final_score": scores[-1],
+                "dec_dose_fractions": f,
+                "dec_scores": scores,
+            })
+        return {
+            "agent": agent,
+            "task": task,
+            "world": world,
+            "episodes": episodes,
+        }
+
+    def test_aggregates_two_agents_one_task(self):
+        results = [
+            self._fake_combo("agent_a", "defect_census", "world_1", [0.3, 0.4]),
+            self._fake_combo("agent_a", "defect_census", "world_2", [0.5, 0.6]),
+            self._fake_combo("agent_b", "defect_census", "world_1", [0.1, 0.2]),
+            self._fake_combo("agent_b", "defect_census", "world_2", [0.2, 0.3]),
+        ]
+        agg = aggregate_results(results)
+        assert ("agent_a", "defect_census") in agg
+        assert ("agent_b", "defect_census") in agg
+        # agent_a mean DEC-AUC = (0.3+0.4+0.5+0.6) / 4 = 0.45
+        assert agg[("agent_a", "defect_census")]["dec_auc"] == pytest.approx(0.45, abs=1e-3)
+        # agent_b mean DEC-AUC = (0.1+0.2+0.2+0.3) / 4 = 0.20
+        assert agg[("agent_b", "defect_census")]["dec_auc"] == pytest.approx(0.20, abs=1e-3)
+        # Returns dicts of all six metric means
+        for key in METRIC_NAMES:
+            assert key in agg[("agent_a", "defect_census")]
+
+    def test_skips_combos_with_no_episodes(self):
+        results = [
+            {"agent": "agent_a", "task": "defect_census", "world": "w1", "episodes": []},
+        ]
+        agg = aggregate_results(results)
+        assert agg == {}
+
+    def test_handles_missing_curve_arrays(self):
+        # Some legacy result files may not include dec_dose_fractions/dec_scores.
+        # In that case we still record dec_auc and final_score from the top-level
+        # episode fields.
+        results = [{
+            "agent": "agent_a", "task": "defect_census", "world": "w1",
+            "episodes": [{"seed": 0, "dec_auc": 0.5, "final_score": 0.7}],
+        }]
+        agg = aggregate_results(results)
+        # dec_auc and final_accuracy still computable; trajectory metrics fall back to NaN
+        assert agg[("agent_a", "defect_census")]["dec_auc"] == pytest.approx(0.5)
+        assert agg[("agent_a", "defect_census")]["final_accuracy"] == pytest.approx(0.7)
+        # Trajectory-dependent metrics are NaN when arrays are missing
+        assert np.isnan(agg[("agent_a", "defect_census")]["early_weighted_auc"])
