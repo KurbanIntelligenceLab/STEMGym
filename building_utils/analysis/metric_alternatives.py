@@ -17,7 +17,10 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
+import json
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 from scipy import stats
@@ -366,3 +369,100 @@ def format_latex_table(
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}"""
+
+
+REPO = Path(__file__).resolve().parent.parent.parent
+RESULTS_DIR = REPO / "results"
+
+CANONICAL_FILES = (
+    "main_defect_census.json",
+    "main_phase_mapping.json",
+    "main_targeted.json",
+    "particle_census.json",
+    "kalinin_baseline_verified.json",
+    "compressed_sensing_verified.json",
+    "vlm_cot_retry_verified.json",
+)
+
+
+def load_canonical_results(results_dir: Path) -> list[dict]:
+    """Load and merge all canonical result files. Skips files that don't exist."""
+    merged: list[dict] = []
+    for name in CANONICAL_FILES:
+        path = results_dir / name
+        if not path.exists():
+            print(f"  [skip] {name} (not found)")
+            continue
+        with open(path) as f:
+            data = json.load(f)
+        if not isinstance(data, dict) or "results" not in data:
+            print(f"  [skip] {name} (unexpected schema)")
+            continue
+        n_combos = len(data["results"])
+        merged.extend(data["results"])
+        print(f"  [load] {name} ({n_combos} combos)")
+    return merged
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--results-dir", type=Path, default=RESULTS_DIR)
+    parser.add_argument(
+        "--json-output", type=Path,
+        default=RESULTS_DIR / "metric_alternatives.json",
+    )
+    parser.add_argument(
+        "--latex-output", type=Path,
+        default=Path(__file__).resolve().parent / "metric_alternatives_table.tex",
+    )
+    args = parser.parse_args()
+
+    print(f"Loading canonical result files from {args.results_dir}")
+    results = load_canonical_results(args.results_dir)
+    print(f"\nLoaded {len(results)} combos total\n")
+
+    print("Aggregating per (agent, task)...")
+    agg = aggregate_results(results)
+    print(f"  -> {len(agg)} (agent, task) pairs")
+
+    tasks = sorted({t for (_, t) in agg})
+    print(f"  -> tasks: {tasks}\n")
+
+    print("Computing rank correlations...")
+    per_task_corr: dict[str, dict[str, dict[str, float]]] = {}
+    per_task_disagreements: dict[str, list[dict]] = {}
+    for task in tasks:
+        corr = rank_correlation(agg, task)
+        if corr is not None:
+            per_task_corr[task] = corr
+            per_task_disagreements[task] = find_disagreements(agg, task)
+            n_agents = sum(1 for (_, t) in agg if t == task)
+            n_dis = len(per_task_disagreements[task])
+            print(f"  {task}: {n_agents} agents, {n_dis} disagreement records")
+
+    print("\nWriting JSON output...")
+    args.json_output.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.json_output, "w") as f:
+        json.dump({
+            "per_agent_metrics": {
+                f"{a}|{t}": m for (a, t), m in agg.items()
+            },
+            "per_task_correlations": per_task_corr,
+            "per_task_disagreements": per_task_disagreements,
+        }, f, indent=2, default=lambda x: float(x) if hasattr(x, "__float__") else str(x))
+    print(f"  -> {args.json_output}")
+
+    print("\nWriting LaTeX table...")
+    latex = format_latex_table(per_task_corr)
+    args.latex_output.parent.mkdir(parents=True, exist_ok=True)
+    with open(args.latex_output, "w") as f:
+        f.write(latex + "\n")
+    print(f"  -> {args.latex_output}")
+
+    print("\n--- LaTeX block (paste into paper/sections/si.tex) ---")
+    print(latex)
+    print("--- end LaTeX block ---")
+
+
+if __name__ == "__main__":
+    main()

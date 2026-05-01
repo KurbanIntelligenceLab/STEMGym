@@ -1,0 +1,16 @@
+\begin{table}[h]
+\centering
+\caption{Spearman $\rho$ between DEC-AUC ranking and alternative-metric rankings, per task. Values close to 1 indicate the agent ordering is preserved under the alternative metric, supporting DEC-AUC's stability as a benchmark choice. \texttt{time-to-threshold} is internally negated (lower-is-better) before ranking so that the correlation reflects agreement, not direction.}
+\label{tab:metric_alternatives}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Alternative metric} & \textbf{Defect Census} & \textbf{Phase Mapping} & \textbf{Targeted} & \textbf{Particle Census} \\
+\midrule
+Final accuracy & $0.880$ & $0.900$ & $0.931$ & $0.917$ \\
+Time-to-threshold & $0.097$ & $0.861$ & $0.641$ & $0.829$ \\
+Early-weighted AUC & $0.994$ & $0.973$ & $0.977$ & $0.872$ \\
+Late-weighted AUC & $0.994$ & $0.994$ & $0.998$ & $0.986$ \\
+Half-budget AUC & $0.984$ & $0.961$ & $0.974$ & $0.854$ \\
+\bottomrule
+\end{tabular}
+\end{table}
