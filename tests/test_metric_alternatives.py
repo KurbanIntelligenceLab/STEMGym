@@ -246,8 +246,8 @@ class TestRankCorrelation:
     def test_skips_task_with_only_one_agent(self):
         agg = {("a", "t"): {name: 0.5 for name in METRIC_NAMES}}
         corr = rank_correlation(agg, "t")
-        # Single-agent ranking is undefined; expect None or NaN
-        assert corr is None or all(np.isnan(v["spearman"]) for v in corr.values())
+        # Single-agent ranking is undefined; rank_correlation contract is to return None.
+        assert corr is None
 
 
 class TestFindDisagreements:

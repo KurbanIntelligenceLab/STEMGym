@@ -245,6 +245,17 @@ def find_disagreements(
     """Identify agent pairs (a, b) where DEC-AUC ranks a > b but at least
     one alternative metric ranks b > a (or vice versa).
 
+    `agent_a` and `agent_b` in each record are in **sorted-name order**
+    (alphabetical), not DEC-AUC order. To find the DEC-AUC winner of a
+    record, compare `dec_auc_a` against `dec_auc_b` directly. The disagreement
+    direction is implicit in the sign of `(dec_auc_a - dec_auc_b)` vs
+    `(alt_a - alt_b)`.
+
+    For `time_to_threshold` (which is "lower is better"), the comparison is
+    performed on negated values internally, but the raw `alt_a` / `alt_b`
+    fields stored in the record are the un-negated original values, so
+    consumers see the metric in its natural orientation.
+
     Returns:
         list of dicts with keys {alt_metric, agent_a, agent_b,
         dec_auc_a, dec_auc_b, alt_a, alt_b}. Each record corresponds to
@@ -262,7 +273,9 @@ def find_disagreements(
                 m_b = agg.get((agent_b, task), {})
                 if name not in m_a or name not in m_b:
                     continue
-                dec_a, dec_b = m_a.get("dec_auc", 0.0), m_b.get("dec_auc", 0.0)
+                if "dec_auc" not in m_a or "dec_auc" not in m_b:
+                    continue
+                dec_a, dec_b = m_a["dec_auc"], m_b["dec_auc"]
                 alt_a, alt_b = m_a[name], m_b[name]
                 if np.isnan(alt_a) or np.isnan(alt_b):
                     continue
