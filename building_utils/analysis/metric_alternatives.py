@@ -294,3 +294,75 @@ def find_disagreements(
                         "alt_b": m_b[name],
                     })
     return out
+
+
+TASK_DISPLAY_ORDER = (
+    "defect_census",
+    "phase_mapping",
+    "targeted",
+    "particle_census",
+)
+
+TASK_DISPLAY_NAMES = {
+    "defect_census": "Defect Census",
+    "phase_mapping": "Phase Mapping",
+    "targeted": "Targeted",
+    "particle_census": "Particle Census",
+}
+
+ALT_DISPLAY_NAMES = {
+    "final_accuracy": "Final accuracy",
+    "time_to_threshold": "Time-to-threshold",
+    "early_weighted_auc": "Early-weighted AUC",
+    "late_weighted_auc": "Late-weighted AUC",
+    "half_budget_auc": "Half-budget AUC",
+}
+
+
+def format_latex_table(
+    per_task: dict[str, dict[str, dict[str, float]]],
+) -> str:
+    """Format the per-task Spearman ρ table as a LaTeX block.
+
+    Args:
+        per_task: dict {task: {alt_metric: {"spearman": float, "kendall": float}}}.
+
+    Returns:
+        Multiline string containing the full \\begin{table}...\\end{table}
+        block, ready for inclusion in `paper/sections/si.tex`.
+    """
+    # Always render the canonical task order; missing tasks become "---" cells.
+    tasks = list(TASK_DISPLAY_ORDER)
+    col_count = len(tasks)
+    col_spec = "l" + "c" * col_count
+
+    headers = " & ".join(["\\textbf{Alternative metric}"] +
+                          [f"\\textbf{{{TASK_DISPLAY_NAMES[t]}}}" for t in tasks])
+
+    rows = []
+    for alt_name in METRIC_NAMES:
+        if alt_name == "dec_auc":
+            continue
+        cells = [ALT_DISPLAY_NAMES[alt_name]]
+        for t in tasks:
+            metrics = per_task.get(t, {}).get(alt_name)
+            if metrics is None or np.isnan(metrics["spearman"]):
+                cells.append("---")
+            else:
+                cells.append(f"${metrics['spearman']:.3f}$")
+        rows.append(" & ".join(cells) + " \\\\")
+
+    body = "\n".join(rows)
+
+    return f"""\\begin{{table}}[h]
+\\centering
+\\caption{{Spearman $\\rho$ between DEC-AUC ranking and alternative-metric rankings, per task. Values close to 1 indicate the agent ordering is preserved under the alternative metric, supporting DEC-AUC's stability as a benchmark choice. \\texttt{{time-to-threshold}} is internally negated (lower-is-better) before ranking so that the correlation reflects agreement, not direction.}}
+\\label{{tab:metric_alternatives}}
+\\begin{{tabular}}{{{col_spec}}}
+\\toprule
+{headers} \\\\
+\\midrule
+{body}
+\\bottomrule
+\\end{{tabular}}
+\\end{{table}}"""

@@ -16,6 +16,7 @@ from building_utils.analysis.metric_alternatives import (
     aggregate_results,
     rank_correlation,
     find_disagreements,
+    format_latex_table,
 )
 
 
@@ -285,3 +286,55 @@ class TestFindDisagreements:
         # No disagreement for the metrics that agree with DEC-AUC
         for ag_metric in ("early_weighted_auc", "late_weighted_auc", "half_budget_auc"):
             assert not any(d["alt_metric"] == ag_metric for d in disagreements)
+
+
+class TestFormatLatexTable:
+    def test_includes_table_skeleton(self):
+        per_task = {
+            "defect_census": {
+                "final_accuracy": {"spearman": 0.95, "kendall": 0.90},
+                "time_to_threshold": {"spearman": 0.80, "kendall": 0.70},
+                "early_weighted_auc": {"spearman": 0.99, "kendall": 0.95},
+                "late_weighted_auc": {"spearman": 0.98, "kendall": 0.93},
+                "half_budget_auc": {"spearman": 0.92, "kendall": 0.85},
+            },
+            "phase_mapping": {
+                "final_accuracy": {"spearman": 0.97, "kendall": 0.92},
+                "time_to_threshold": {"spearman": 0.75, "kendall": 0.65},
+                "early_weighted_auc": {"spearman": 0.99, "kendall": 0.96},
+                "late_weighted_auc": {"spearman": 0.96, "kendall": 0.91},
+                "half_budget_auc": {"spearman": 0.93, "kendall": 0.86},
+            },
+        }
+        latex = format_latex_table(per_task)
+        # Skeleton checks
+        assert "\\begin{table}" in latex
+        assert "\\label{tab:metric_alternatives}" in latex
+        assert "\\toprule" in latex and "\\bottomrule" in latex
+        # Task headers in column order
+        assert "Defect Census" in latex
+        assert "Phase Mapping" in latex
+        # Metric row labels
+        assert "Final accuracy" in latex
+        assert "Time-to-threshold" in latex
+        assert "Early-weighted AUC" in latex
+        assert "Late-weighted AUC" in latex
+        assert "Half-budget AUC" in latex
+        # Sample numeric entries (formatted to 3 decimals)
+        assert "0.950" in latex  # final_accuracy / defect_census
+        assert "0.970" in latex  # final_accuracy / phase_mapping
+
+    def test_handles_missing_task(self):
+        per_task = {
+            "defect_census": {
+                "final_accuracy": {"spearman": 0.95, "kendall": 0.90},
+                "time_to_threshold": {"spearman": 0.80, "kendall": 0.70},
+                "early_weighted_auc": {"spearman": 0.99, "kendall": 0.95},
+                "late_weighted_auc": {"spearman": 0.98, "kendall": 0.93},
+                "half_budget_auc": {"spearman": 0.92, "kendall": 0.85},
+            },
+            # phase_mapping intentionally omitted
+        }
+        latex = format_latex_table(per_task)
+        # Cells for the missing task should be "---"
+        assert "---" in latex
