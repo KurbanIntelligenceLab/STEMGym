@@ -11,6 +11,8 @@ from building_utils.analysis.metric_alternatives import (
     early_weighted_auc,
     late_weighted_auc,
     half_budget_auc,
+    compute_all_metrics,
+    METRIC_NAMES,
 )
 
 
@@ -95,3 +97,27 @@ class TestWeightedAUCs:
         assert early_weighted_auc(empty, empty) == 0.0
         assert late_weighted_auc(empty, empty) == 0.0
         assert half_budget_auc(empty, empty) == 0.0
+
+
+class TestComputeAllMetrics:
+    def test_returns_dict_with_six_keys(self):
+        f = np.linspace(0, 1, 51)
+        s = np.ones_like(f)
+        result = compute_all_metrics(s, f)
+        assert set(result.keys()) == set(METRIC_NAMES)
+        assert len(METRIC_NAMES) == 6
+
+    def test_dec_auc_matches_trapezoidal(self):
+        f = np.linspace(0, 1, 51)
+        s = f.copy()  # Linear ramp; integral = 0.5
+        result = compute_all_metrics(s, f)
+        assert result["dec_auc"] == pytest.approx(0.5, abs=1e-3)
+        assert result["final_accuracy"] == pytest.approx(1.0)
+        assert result["half_budget_auc"] == pytest.approx(0.25, abs=1e-3)
+
+    def test_handles_empty_input(self):
+        empty = np.array([])
+        result = compute_all_metrics(empty, empty)
+        assert result["dec_auc"] == 0.0
+        assert result["final_accuracy"] == 0.0
+        assert result["time_to_threshold"] == 1.0

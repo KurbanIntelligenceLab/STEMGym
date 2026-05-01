@@ -93,3 +93,40 @@ def half_budget_auc(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
     f_trunc = dose_fractions[mask]
     s_trunc = scores[mask]
     return _trapz(s_trunc, f_trunc) / 0.5
+
+
+METRIC_NAMES = (
+    "dec_auc",
+    "final_accuracy",
+    "time_to_threshold",
+    "early_weighted_auc",
+    "late_weighted_auc",
+    "half_budget_auc",
+)
+
+
+def dec_auc_from_curve(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
+    """Standard trapezoidal DEC-AUC (matches stem_gym.metrics.compute_dec)."""
+    if len(scores) == 0:
+        return 0.0
+    return _trapz(scores, dose_fractions)
+
+
+def compute_all_metrics(
+    scores: np.ndarray,
+    dose_fractions: np.ndarray,
+) -> dict[str, float]:
+    """Compute all six metrics on a single dose-score curve.
+
+    Returns a dict keyed by METRIC_NAMES. Each value is a float in [0, 1]
+    (or [0, 1] for time_to_threshold where 1.0 means threshold never
+    reached).
+    """
+    return {
+        "dec_auc": dec_auc_from_curve(scores, dose_fractions),
+        "final_accuracy": final_accuracy(scores, dose_fractions),
+        "time_to_threshold": time_to_threshold(scores, dose_fractions),
+        "early_weighted_auc": early_weighted_auc(scores, dose_fractions),
+        "late_weighted_auc": late_weighted_auc(scores, dose_fractions),
+        "half_budget_auc": half_budget_auc(scores, dose_fractions),
+    }
