@@ -20,6 +20,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 import numpy as np
+from scipy import stats
 
 
 def final_accuracy(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
@@ -193,4 +194,45 @@ def aggregate_results(
             name: float(np.nanmean(values)) if len(values) > 0 and not all(np.isnan(values)) else float("nan")
             for name, values in metric_lists.items()
         }
+    return out
+
+
+def rank_correlation(
+    agg: dict[tuple[str, str], dict[str, float]],
+    task: str,
+) -> dict[str, dict[str, float]] | None:
+    """Per-task: compute Spearman ρ and Kendall τ between DEC-AUC ranking
+    and each alternative-metric ranking. Returns None if fewer than two
+    agents are present for the given task.
+
+    For `time_to_threshold`, lower values mean faster convergence (better),
+    so the metric is negated before ranking to align with DEC-AUC's
+    "higher is better" convention.
+
+    Returns:
+        dict mapping alt-metric-name -> {"spearman": ρ, "kendall": τ}.
+        Excludes `dec_auc` itself (trivially 1.0).
+    """
+    pairs = [(agent, m["dec_auc"], m) for (agent, t), m in agg.items() if t == task]
+    if len(pairs) < 2:
+        return None
+
+    dec_values = np.array([p[1] for p in pairs])
+
+    out: dict[str, dict[str, float]] = {}
+    for name in METRIC_NAMES:
+        if name == "dec_auc":
+            continue
+        alt_values = np.array([p[2][name] for p in pairs])
+        # time_to_threshold is "lower is better", invert for fair comparison
+        if name == "time_to_threshold":
+            alt_values = -alt_values
+        # Drop pairs where either side is NaN
+        mask = ~(np.isnan(dec_values) | np.isnan(alt_values))
+        if mask.sum() < 2:
+            out[name] = {"spearman": float("nan"), "kendall": float("nan")}
+            continue
+        sp, _ = stats.spearmanr(dec_values[mask], alt_values[mask])
+        kt, _ = stats.kendalltau(dec_values[mask], alt_values[mask])
+        out[name] = {"spearman": float(sp), "kendall": float(kt)}
     return out

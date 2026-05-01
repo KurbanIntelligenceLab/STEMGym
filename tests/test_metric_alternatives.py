@@ -14,6 +14,7 @@ from building_utils.analysis.metric_alternatives import (
     compute_all_metrics,
     METRIC_NAMES,
     aggregate_results,
+    rank_correlation,
 )
 
 
@@ -199,3 +200,50 @@ class TestAggregateResults:
         assert agg[("agent_a", "defect_census")]["final_accuracy"] == pytest.approx(0.7)
         # Trajectory-dependent metrics are NaN when arrays are missing
         assert np.isnan(agg[("agent_a", "defect_census")]["early_weighted_auc"])
+
+
+class TestRankCorrelation:
+    def test_perfect_agreement(self):
+        # Three agents, all metrics rank them in the same order
+        agg = {
+            ("a", "t"): {"dec_auc": 0.9, "final_accuracy": 0.9, "early_weighted_auc": 0.8,
+                          "late_weighted_auc": 0.95, "half_budget_auc": 0.7,
+                          "time_to_threshold": 0.1},
+            ("b", "t"): {"dec_auc": 0.5, "final_accuracy": 0.5, "early_weighted_auc": 0.4,
+                          "late_weighted_auc": 0.55, "half_budget_auc": 0.3,
+                          "time_to_threshold": 0.5},
+            ("c", "t"): {"dec_auc": 0.1, "final_accuracy": 0.1, "early_weighted_auc": 0.05,
+                          "late_weighted_auc": 0.15, "half_budget_auc": 0.02,
+                          "time_to_threshold": 1.0},
+        }
+        corr = rank_correlation(agg, "t")
+        # Per-metric ρ vs dec_auc; all should be 1.0 (perfect monotone agreement).
+        # Note: time_to_threshold is INVERTED (lower is better) but we expect
+        # rank_correlation to handle that internally.
+        assert corr["final_accuracy"]["spearman"] == pytest.approx(1.0)
+        assert corr["early_weighted_auc"]["spearman"] == pytest.approx(1.0)
+        assert corr["late_weighted_auc"]["spearman"] == pytest.approx(1.0)
+        assert corr["half_budget_auc"]["spearman"] == pytest.approx(1.0)
+        assert corr["time_to_threshold"]["spearman"] == pytest.approx(1.0)
+
+    def test_inverted_for_one_metric(self):
+        # Two agents ranked oppositely under DEC-AUC and final_accuracy
+        agg = {
+            ("a", "t"): {"dec_auc": 0.9, "final_accuracy": 0.1,
+                          "early_weighted_auc": 0.9, "late_weighted_auc": 0.9,
+                          "half_budget_auc": 0.9, "time_to_threshold": 0.1},
+            ("b", "t"): {"dec_auc": 0.1, "final_accuracy": 0.9, "early_weighted_auc": 0.1,
+                          "late_weighted_auc": 0.1, "half_budget_auc": 0.1,
+                          "time_to_threshold": 0.9},
+        }
+        corr = rank_correlation(agg, "t")
+        # final_accuracy ranks them opposite; with n=2 Spearman is +/- 1
+        assert corr["final_accuracy"]["spearman"] == pytest.approx(-1.0)
+        # Others agree with DEC-AUC
+        assert corr["early_weighted_auc"]["spearman"] == pytest.approx(1.0)
+
+    def test_skips_task_with_only_one_agent(self):
+        agg = {("a", "t"): {name: 0.5 for name in METRIC_NAMES}}
+        corr = rank_correlation(agg, "t")
+        # Single-agent ranking is undefined; expect None or NaN
+        assert corr is None or all(np.isnan(v["spearman"]) for v in corr.values())
