@@ -98,6 +98,19 @@ class TestWeightedAUCs:
         assert late_weighted_auc(empty, empty) == 0.0
         assert half_budget_auc(empty, empty) == 0.0
 
+    def test_half_budget_returns_nan_when_no_first_half_points(self):
+        # Single point at f=1.0: mask.sum() < 2, so half-budget AUC is undefined.
+        scores = np.array([0.5])
+        dose_fractions = np.array([1.0])
+        assert np.isnan(half_budget_auc(scores, dose_fractions))
+
+    def test_half_budget_returns_nan_when_one_first_half_point(self):
+        # Two points but only f=0.0 is in the first half; not enough to integrate.
+        scores = np.array([0.5, 0.5])
+        dose_fractions = np.array([0.0, 1.0])
+        # mask = [True, False], mask.sum() = 1, returns NaN.
+        assert np.isnan(half_budget_auc(scores, dose_fractions))
+
 
 class TestComputeAllMetrics:
     def test_returns_dict_with_six_keys(self):

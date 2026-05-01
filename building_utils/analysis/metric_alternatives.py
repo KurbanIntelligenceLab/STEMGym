@@ -49,8 +49,10 @@ def time_to_threshold(
 
 
 def _trapz(y: np.ndarray, x: np.ndarray) -> float:
-    """Trapezoidal integration with numpy version compatibility."""
-    fn = getattr(np, "trapezoid", getattr(np, "trapz", None))
+    """Trapezoidal integration with numpy version compatibility (np.trapezoid in 2.x, np.trapz in 1.x)."""
+    fn = getattr(np, "trapezoid", None) or getattr(np, "trapz", None)
+    if fn is None:
+        raise RuntimeError("numpy has neither trapezoid nor trapz; numpy >= 1.24 is required")
     return float(fn(y, x))
 
 
@@ -83,13 +85,16 @@ def half_budget_auc(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
 
     Computed as (1/0.5) * integral from f=0 to f=0.5 of s(f). Tests
     whether the DEC-AUC ranking depends on the budget cap by truncating
-    the curve at half budget.
+    the curve at half budget. Returns NaN when the curve is supplied but
+    has fewer than two points in the first half (under-defined truncation),
+    so downstream rank correlation can drop the agent rather than treating
+    it as a true zero score.
     """
     if len(scores) == 0:
         return 0.0
     mask = dose_fractions <= 0.5
     if mask.sum() < 2:
-        return 0.0
+        return float("nan")
     f_trunc = dose_fractions[mask]
     s_trunc = scores[mask]
     return _trapz(s_trunc, f_trunc) / 0.5
