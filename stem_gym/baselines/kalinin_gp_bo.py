@@ -113,9 +113,12 @@ class KalininGPBOAgent(Agent):
         from botorch.models import SingleTaskGP
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        # Tiny GP (≤200 points × 2 features); CPU avoids GPU-arch
-        # mismatches (e.g., RTX 5090 sm_120 with PyTorch 2.5.x).
-        device = "cpu"
+        # GP fit cost is O(n^3) so CPU is fine at low n but becomes the
+        # bottleneck at n>~100 (high-budget runs). Use GPU when available;
+        # set STEMGYM_FORCE_CPU_GP=1 to fall back on RTX 5090 (sm_120).
+        import os
+        _force_cpu = os.environ.get("STEMGYM_FORCE_CPU_GP") == "1"
+        device = "cuda" if (torch.cuda.is_available() and not _force_cpu) else "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=device)
         train_Y = torch.tensor(
             self._Y, dtype=torch.float64, device=device

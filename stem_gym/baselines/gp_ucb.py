@@ -77,10 +77,14 @@ class GPUCBAgent(Agent):
         from botorch.fit import fit_gpytorch_mll
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        # Tiny GP (≤200 points × 2 features); CPU avoids GPU-arch
-        # mismatches (e.g., RTX 5090 sm_120 with PyTorch 2.5.x). The
-        # negligible CPU overhead is dwarfed by analyst inference cost.
-        _device = "cpu"
+        # GP fit cost is O(n^3) so CPU is fine at low n but becomes the
+        # bottleneck at n>~100 (high-budget runs). Use GPU when available;
+        # known caveat: PyTorch 2.5.x bundled CUDA kernels lack sm_120
+        # support, so RTX 5090 deployments may need to set the
+        # STEMGYM_FORCE_CPU_GP=1 env var to fall back to CPU.
+        import os
+        _force_cpu = os.environ.get("STEMGYM_FORCE_CPU_GP") == "1"
+        _device = "cuda" if (torch.cuda.is_available() and not _force_cpu) else "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 
