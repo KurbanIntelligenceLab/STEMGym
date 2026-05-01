@@ -386,15 +386,21 @@ CANONICAL_FILES = (
 
 
 def load_canonical_results(results_dir: Path) -> list[dict]:
-    """Load and merge all canonical result files. Skips files that don't exist."""
+    """Load and merge all canonical result files. Skips files that are
+    missing, malformed, or have an unexpected schema (printing a [skip]
+    diagnostic for each)."""
     merged: list[dict] = []
     for name in CANONICAL_FILES:
         path = results_dir / name
         if not path.exists():
             print(f"  [skip] {name} (not found)")
             continue
-        with open(path) as f:
-            data = json.load(f)
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"  [skip] {name} (malformed JSON: {e})")
+            continue
         if not isinstance(data, dict) or "results" not in data:
             print(f"  [skip] {name} (unexpected schema)")
             continue
@@ -402,6 +408,17 @@ def load_canonical_results(results_dir: Path) -> list[dict]:
         merged.extend(data["results"])
         print(f"  [load] {name} ({n_combos} combos)")
     return merged
+
+
+def _json_default(x):
+    """Strict JSON-encode hook: numpy scalars become Python floats/ints,
+    everything else raises TypeError so unknown types fail loudly rather
+    than silently stringifying."""
+    if hasattr(x, "__float__"):
+        return float(x)
+    if isinstance(x, np.integer):
+        return int(x)
+    raise TypeError(f"Object of type {type(x).__name__} is not JSON serializable")
 
 
 def main() -> None:
@@ -449,7 +466,7 @@ def main() -> None:
             },
             "per_task_correlations": per_task_corr,
             "per_task_disagreements": per_task_disagreements,
-        }, f, indent=2, default=lambda x: float(x) if hasattr(x, "__float__") else str(x))
+        }, f, indent=2, default=_json_default)
     print(f"  -> {args.json_output}")
 
     print("\nWriting LaTeX table...")
