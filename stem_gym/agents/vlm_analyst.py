@@ -178,6 +178,12 @@ def _call_openrouter(image_b64: str, model: str) -> dict:
     )
 
     text = response.choices[0].message.content
+    if not text:
+        # Reasoning models (notably gpt-5-mini under a low max_tokens cap) sometimes
+        # return None or empty content when internal reasoning consumes the budget
+        # before the structured output is emitted. Raise JSONDecodeError so the
+        # retry loop in _call_vlm catches it instead of bombing on text.strip().
+        raise json.JSONDecodeError("VLM returned empty content", "", 0)
     return _extract_json(text)
 
 
