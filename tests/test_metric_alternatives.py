@@ -8,6 +8,9 @@ import pytest
 from building_utils.analysis.metric_alternatives import (
     final_accuracy,
     time_to_threshold,
+    early_weighted_auc,
+    late_weighted_auc,
+    half_budget_auc,
 )
 
 
@@ -46,3 +49,49 @@ class TestTimeToThreshold:
 
     def test_empty_returns_one(self):
         assert time_to_threshold(np.array([]), np.array([]), threshold=0.8) == 1.0
+
+
+class TestWeightedAUCs:
+    """Reference: a constant-1 score gives all variants exactly 1.0
+    because each weighting integrates to 1 over [0, 1].
+    """
+
+    def test_constant_one_yields_one_for_all(self):
+        f = np.linspace(0, 1, 51)
+        s = np.ones_like(f)
+        assert early_weighted_auc(s, f) == pytest.approx(1.0, abs=1e-3)
+        assert late_weighted_auc(s, f) == pytest.approx(1.0, abs=1e-3)
+        assert half_budget_auc(s, f) == pytest.approx(1.0, abs=1e-3)
+
+    def test_constant_zero_yields_zero(self):
+        f = np.linspace(0, 1, 51)
+        s = np.zeros_like(f)
+        assert early_weighted_auc(s, f) == 0.0
+        assert late_weighted_auc(s, f) == 0.0
+        assert half_budget_auc(s, f) == 0.0
+
+    def test_step_function_at_half_distinguishes_variants(self):
+        # Score is 0 for f < 0.5, 1 for f >= 0.5.
+        f = np.linspace(0, 1, 51)
+        s = (f >= 0.5).astype(float)
+        # Late-weighted picks up most of the weight (rising weight on the
+        # high-score half). Early-weighted picks up little (rising weight
+        # on the zero half). Half-budget AUC is exactly 0 (no score in
+        # the first half).
+        assert late_weighted_auc(s, f) > early_weighted_auc(s, f)
+        assert half_budget_auc(s, f) == pytest.approx(0.0, abs=0.05)
+
+    def test_step_function_at_quarter_distinguishes_variants(self):
+        # Score is 0 for f < 0.25, 1 for f >= 0.25.
+        f = np.linspace(0, 1, 51)
+        s = (f >= 0.25).astype(float)
+        # Now early-weighted picks up substantial weight too because the
+        # score rises early.
+        assert early_weighted_auc(s, f) > 0.5
+        assert late_weighted_auc(s, f) > 0.5
+
+    def test_empty_returns_zero(self):
+        empty = np.array([])
+        assert early_weighted_auc(empty, empty) == 0.0
+        assert late_weighted_auc(empty, empty) == 0.0
+        assert half_budget_auc(empty, empty) == 0.0

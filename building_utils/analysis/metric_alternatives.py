@@ -46,3 +46,50 @@ def time_to_threshold(
     if len(above) == 0:
         return 1.0
     return float(dose_fractions[above[0]])
+
+
+def _trapz(y: np.ndarray, x: np.ndarray) -> float:
+    """Trapezoidal integration with numpy version compatibility."""
+    fn = getattr(np, "trapezoid", getattr(np, "trapz", None))
+    return float(fn(y, x))
+
+
+def early_weighted_auc(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
+    """Trapezoidal integral of s(f) * w_early(f) where w_early(f) = 2(1-f).
+
+    The weight ramps linearly from 2 at f=0 to 0 at f=1 and integrates to
+    1 over [0, 1], so a constant-1 score yields exactly 1.0. Privileges
+    front-loaded acquisition strategies that reach high scores early.
+    """
+    if len(scores) == 0:
+        return 0.0
+    weights = 2.0 * (1.0 - dose_fractions)
+    return _trapz(scores * weights, dose_fractions)
+
+
+def late_weighted_auc(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
+    """Trapezoidal integral of s(f) * w_late(f) where w_late(f) = 2f.
+
+    Mirror image of `early_weighted_auc`. Privileges asymptotic accuracy.
+    """
+    if len(scores) == 0:
+        return 0.0
+    weights = 2.0 * dose_fractions
+    return _trapz(scores * weights, dose_fractions)
+
+
+def half_budget_auc(scores: np.ndarray, dose_fractions: np.ndarray) -> float:
+    """DEC-AUC restricted to the first half of dose, rescaled to [0, 1].
+
+    Computed as (1/0.5) * integral from f=0 to f=0.5 of s(f). Tests
+    whether the DEC-AUC ranking depends on the budget cap by truncating
+    the curve at half budget.
+    """
+    if len(scores) == 0:
+        return 0.0
+    mask = dose_fractions <= 0.5
+    if mask.sum() < 2:
+        return 0.0
+    f_trunc = dose_fractions[mask]
+    s_trunc = scores[mask]
+    return _trapz(s_trunc, f_trunc) / 0.5
