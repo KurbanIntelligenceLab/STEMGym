@@ -40,6 +40,7 @@ PROVIDER_MODELS = {
     "gpt5": "openai/gpt-5-mini",
     "llama": "meta-llama/llama-4-scout",
     "gemini_flash": "google/gemini-2.0-flash-001",
+    "claude_opus": "anthropic/claude-opus-4.7",
 }
 
 # System prompt for VLM tile analysis
@@ -128,14 +129,63 @@ def _extract_json(text: str) -> dict:
             if stripped.startswith("{") and stripped.endswith("}"):
                 return json.loads(stripped)
 
-    # 3. Last balanced {...} substring
-    last_open = text.rfind("{")
-    last_close = text.rfind("}")
-    if last_open != -1 and last_close > last_open:
-        return json.loads(text[last_open : last_close + 1])
+    # 3. Brace-matched outermost {...}: scan for the largest balanced JSON object.
+    # Required because reasoning models (e.g. gpt-5-mini) sometimes emit valid
+    # nested JSON without wrapping in a fenced block; rfind('{') would land
+    # inside an inner array element and produce an invalid slice.
+    obj = _scan_outermost_object(text)
+    if obj is not None:
+        return json.loads(obj)
 
     # No JSON found — raise the same exception type the retry loop watches for
     raise json.JSONDecodeError("No JSON object found in VLM response", text, 0)
+
+
+def _scan_outermost_object(text: str) -> str | None:
+    """Return the substring of the first balanced top-level {...} object, or None.
+
+    Tracks brace depth, ignoring braces inside string literals. Picks the
+    largest top-level object so a response that opens with a stray `{` then
+    later emits the real JSON still parses.
+    """
+    best: str | None = None
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "{":
+            i += 1
+            continue
+        depth = 0
+        in_str = False
+        escape = False
+        start = i
+        while i < n:
+            ch = text[i]
+            if in_str:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == '"':
+                    in_str = True
+                elif ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[start : i + 1]
+                        if best is None or len(candidate) > len(best):
+                            best = candidate
+                        i += 1
+                        break
+            i += 1
+        else:
+            # ran off end of string with depth > 0; abandon
+            break
+    return best
 
 
 def _call_openrouter(image_b64: str, model: str) -> dict:

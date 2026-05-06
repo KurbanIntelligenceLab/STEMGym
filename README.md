@@ -146,14 +146,14 @@ Code: MIT. Data: CC-BY-4.0.
 
 ## Authors
 
-Can Polat — Kurban Intelligence Lab
+ANON
 
 ## Citation
 
 ```bibtex
-@inproceedings{polat2026stemgym,
+@inproceedings{2026stemgym,
   title={STEMGym: A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Transmission Electron Microscopy},
-  author={Polat, Can},
+  author={anon},
   year={2026}
 }
 ```

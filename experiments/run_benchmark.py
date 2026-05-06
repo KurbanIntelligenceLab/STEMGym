@@ -179,6 +179,11 @@ AGENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "GP-UCB + Gemini 2.0 Flash VLM analyst",
         "kwargs": {"provider": "gemini_flash"},
     },
+    "raster_vlm_opus": {
+        "class": "stem_gym.baselines.vlm_baselines.RasterVLMAgent",
+        "description": "Raster + Claude Opus 4.7 VLM analyst (frontier-flagship sanity check, C5b)",
+        "kwargs": {"provider": "claude_opus"},
+    },
     # -- Zoom/dwell ablation variants --
     "raster_equipped_z2": {
         "class": "stem_gym.baselines.equipped_baselines.RasterEquippedAgent",

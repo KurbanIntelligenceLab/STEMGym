@@ -60,7 +60,16 @@ class STEMEnv(gym.Env):
         render_mode: str | None = None,
     ):
         super().__init__()
-        self.world = World(world_path)
+        # Auto-detect replay worlds by metadata so real-data acquisitions don't
+        # have Poisson noise re-applied on top of native experimental noise.
+        import h5py
+        with h5py.File(world_path, "r") as _probe:
+            _difficulty = str(_probe["metadata"].attrs.get("difficulty", ""))
+        if _difficulty == "real":
+            from stem_gym.envs.replay_world import ReplayWorld
+            self.world = ReplayWorld(world_path)
+        else:
+            self.world = World(world_path)
         self.task = task or DummyTask()
         self.dose_per_acquire = dose_per_acquire
         self.overview_size = overview_size
