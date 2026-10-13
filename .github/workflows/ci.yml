@@ -26,7 +26,7 @@ jobs:
       - run: uv run --locked python reproducibility/prepare_test_data.py
       - run: uv run --locked pytest -m "not slow and not training" -q
       - run: uv run --locked python reproducibility/verify_reference.py
-      - run: uv build --out-dir development/dist
+      - run: uv build --out-dir dist
       - run: uv run --locked python reproducibility/package_source.py
   training-smoke:
     timeout-minutes: 10

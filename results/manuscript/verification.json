@@ -17,14 +17,6 @@
     "warnings": 16
   },
   "calibration_audit_repeated": true,
-  "title_unchanged": true,
-  "all_current_citation_keys_resolve": true,
-  "all_current_internal_references_resolve": true,
-  "compilation": {
-    "editor": "Blocked: standalone compiler cannot resolve iopjournal.cls",
-    "supplement": "Local draft-mode source check passed; no PDF generated",
-    "main": "Local draft-mode source check passed; no PDF generated"
-  },
   "physical_calibration_validated": false,
   "reference_checks": {
     "episodes": 220,
@@ -50,108 +42,6 @@
       }
     ]
   },
-  "source_check_page_counts": {
-    "main": 12,
-    "supplement": 8
-  },
-  "all_inputs_figures_citations_and_labels_checked_twice": true,
-  "full_document_visual_review": "Not performed: no standalone document PDF generated, respecting the open-editor request.",
-  "figure_visual_review": "Both figures retained in the article inspected after regeneration; duplicate summary figure omitted from article. Numerical values independently verified.",
   "test_fixtures_match_pinned_release": true,
-  "reproduction_script_syntax_checked": true,
-  "consistency_revision": {
-    "title_verified_against_original_and_previous_revision": true,
-    "saved_evaluator_and_episode_results_unchanged": true,
-    "independent_second_score_and_fallback_check": true,
-    "selected_results_and_output_directory_workflow_verified": true,
-    "verification_rejects_altered_integrals_and_table_rows": true,
-    "verification_has_no_default_write_side_effects": true,
-    "latex_checks": "Two final draft-mode passes for main and supplement: no errors, overfull boxes, or unresolved citations/references; no document PDF generated.",
-    "native_editor_status": "Compiler still cannot resolve supplied multi-file iopjournal.cls; full document visual review unverified.",
-    "physical_data_correction_performed": false,
-    "existing_39_test_result": "Retained from prior verification; environment, scoring and inference source unchanged, so the suite was not rerun."
-  },
-  "inline_tables_revision": {
-    "tables_in_relevant_sections": true,
-    "standalone_table_files_removed": true,
-    "expanded_latex_content_unchanged": true,
-    "generation_preserves_section_text_verified_twice": true,
-    "reference_values_verified": true,
-    "main_and_supplement_draft_checks_passed_twice": true
-  },
-  "citation_revision": {
-    "scope": "External literature and borrowed methods; own results and settings left uncited",
-    "compiled_reference_counts": {
-      "main": 31,
-      "supplement": 20
-    },
-    "all_cited_keys_resolve": true,
-    "original_title_and_results_unchanged": true,
-    "primary_sources_and_metadata_reviewed_twice": true,
-    "corrected_entries": [
-      "Rasmussen and Williams book identity",
-      "GP-UCB conference record",
-      "Pennycook and Nellist editor roles",
-      "ASE author parsing",
-      "Daume III name parsing",
-      "Zilberstein page range"
-    ],
-    "document_pdf_generated": false
-  },
-  "final_citation_sweep": {
-    "scope": "Main manuscript and supplementary material; external claims and borrowed methods only",
-    "new_sources": [
-      "Goodfellow et al. 2016: early stopping and cross-entropy",
-      "Harris et al. 2020: NumPy",
-      "Paszke et al. 2019: PyTorch",
-      "h5py official documentation"
-    ],
-    "claim_source_mapping_reviewed_twice": true,
-    "title_results_and_tables_unchanged": true,
-    "all_cited_keys_match_compiled_bibliographies": true,
-    "draft_mode_checks_passed": true,
-    "native_editor": "Cannot resolve supplied iopjournal.cls; no replacement PDF created"
-  },
-  "manuscript_scope_cleanup": {
-    "date": "2026-10-09",
-    "retired_branches_removed": [
-      "beam damage",
-      "VLM and LLM planners",
-      "RL baselines",
-      "transfer and adaptation",
-      "multi-agent ablations",
-      "SingleBO and alternative acquisition functions",
-      "composite Pareto metrics",
-      "human baseline UI",
-      "legacy experiment CLI/configurations/results"
-    ],
-    "unused_bibliography_entries_removed": 33,
-    "retained_cited_bibliography_entries": 36,
-    "retained_tests": {
-      "passed": 66,
-      "deselected_training_tests": 5,
-      "simulation_tests_run": false
-    },
-    "retained_data_and_checkpoint_hashes_verified": 20,
-    "published_evaluator_hash_unchanged": true,
-    "reference_records_verified": 220,
-    "fresh_repeatability_checks": [
-      {
-        "world": "srtio3_clustered_easy",
-        "policy": "raster_trained",
-        "seed": 0,
-        "exactly_reproduced": true
-      },
-      {
-        "world": "srtio3_clustered_easy",
-        "policy": "gp_defect_trained",
-        "seed": 0,
-        "exactly_reproduced": true
-      }
-    ],
-    "local_draft_compilation": "Main and supplement passed with all references resolved; no document PDF generated",
-    "native_editor_compilation": "Cannot resolve supplied iopjournal.cls",
-    "editable_package_installation": "Passed",
-    "title_and_reported_results_unchanged": true
-  }
+  "reproduction_script_syntax_checked": true
 }

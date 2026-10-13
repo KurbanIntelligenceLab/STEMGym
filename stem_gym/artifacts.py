@@ -1,4 +1,4 @@
-"""Protect manuscript evidence and validate preserved source identities."""
+"""Protect reference files and validate source identities."""
 
 from pathlib import Path
 import hashlib
@@ -8,11 +8,11 @@ import zipfile
 
 def writable_output(path: Path, root: Path) -> Path:
     resolved = path.resolve()
-    for directory in ("results/manuscript", "development/final_manuscript_mlst"):
+    for directory in ("results/manuscript", "development"):
         protected = (root / directory).resolve()
         if resolved == protected or protected in resolved.parents:
             raise ValueError(
-                f"Refusing to overwrite preserved manuscript files: {resolved}"
+                f"Refusing to overwrite protected files: {resolved}"
             )
     return resolved
 
@@ -22,7 +22,7 @@ def verify_preservation(evidence: Path) -> dict:
     for name, digest in manifest["files"].items():
         if hashlib.sha256((evidence / name).read_bytes()).hexdigest() != digest:
             raise ValueError(f"Preserved evidence changed: {name}")
-    with zipfile.ZipFile(evidence / "original_source.zip") as archive:
+    with zipfile.ZipFile(evidence / "reference_source.zip") as archive:
         sources = json.loads(archive.read("SOURCE_MANIFEST.json"))
         for name, digest in sources.items():
             if hashlib.sha256(archive.read(name)).hexdigest() != digest:

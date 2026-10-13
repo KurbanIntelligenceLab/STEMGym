@@ -166,7 +166,7 @@ def main():
         "--results", type=Path, default=EVIDENCE / "reference_results.json"
     )
     parser.add_argument(
-        "--artifacts-dir", type=Path, help="Optional directory containing generated summary and table, or local manuscript"
+        "--artifacts-dir", type=Path, help="Optional directory containing the summary and results table"
     )
     parser.add_argument(
         "--report",

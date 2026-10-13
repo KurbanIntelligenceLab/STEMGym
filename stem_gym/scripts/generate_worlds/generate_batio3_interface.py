@@ -13,7 +13,7 @@ scipy.ndimage.distance_transform_edt.  O atoms close to boundaries get
 higher vacancy probability via plant_vacancies_weighted.
 
 Usage:
-    python stem_gym/scripts/generate_worlds/generate_batio3_interface.py [--difficulty easy|medium|hard]
+    uv run --locked --extra sim python stem_gym/scripts/generate_worlds/generate_batio3_interface.py [--difficulty easy|medium|hard]
                                                       [--output data/simulated/batio3_interface.h5]
                                                       [--device cpu|gpu]
                                                       [--seed 42]

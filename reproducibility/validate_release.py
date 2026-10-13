@@ -10,7 +10,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-OUTPUT = ROOT / "development/verification"
+OUTPUT = ROOT / "results/verification"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 manifest = json.loads((ROOT / "results/manuscript/release_manifest.json").read_text())
 revision = manifest["sha"]

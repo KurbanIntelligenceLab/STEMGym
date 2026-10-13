@@ -1,4 +1,4 @@
-"""Generate manuscript figures and tables directly from released records and logs."""
+"""Generate figures and tables from released records and evaluation logs."""
 
 from pathlib import Path
 import argparse, json
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "development/generated"
+OUT = ROOT / "results/generated"
 HERE = Path(__file__).resolve().parent
 REPRO_OUT = HERE
 plt.rcParams.update(
@@ -48,7 +48,7 @@ COLORS = ["#7c8792", "#126aab", "#df9635", "#31846c", "#9b5e99"]
 
 
 def write_generated_table(section, name, table):
-    """Update the table in its section, retaining surrounding manuscript text."""
+    """Write a generated table between its section markers."""
     target = OUT / section
     begin = "% BEGIN GENERATED TABLE: " + name
     end = "% END GENERATED TABLE: " + name

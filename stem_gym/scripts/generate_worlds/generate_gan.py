@@ -58,7 +58,7 @@ Electron optics (shared benchmark parameters):
     0.05 Å potential sampling, 1.0 Å slice thickness, PRISM
 
 Usage:
-    python stem_gym/scripts/generate_worlds/generate_gan.py [--difficulty easy|medium|hard]
+    uv run --locked --extra sim python stem_gym/scripts/generate_worlds/generate_gan.py [--difficulty easy|medium|hard]
                                         [--output data/simulated/gan.h5]
                                         [--device cpu|gpu]
                                         [--seed 42]
