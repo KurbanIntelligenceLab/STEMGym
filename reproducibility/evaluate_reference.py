@@ -1,4 +1,4 @@
-"""Reproduce the compact dataset-paper evaluation from the repository root.
+"""Run the reference evaluation from the repository root.
 
 Every acquisition is analysed at its true tile centre before scoring or
 selecting the next tile. Results are saved in one resumable JSON file.

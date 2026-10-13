@@ -1,4 +1,4 @@
-"""Protect manuscript evidence and validate preserved source identities."""
+"""Protect reference files and validate source identities."""
 
 from pathlib import Path
 import hashlib

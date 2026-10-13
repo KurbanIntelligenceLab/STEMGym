@@ -25,7 +25,7 @@ uv run --locked --extra sim pytest -m slow
 
 For CUDA simulation on Linux x86-64, add `--extra cuda` alongside `--extra sim`. CuPy is separate from the CPU simulation dependencies. CI runs one-epoch training smoke tests on eight tiles and at most 32 defect patches, checking finite losses, parameter updates, and checkpoint roundtrips. Run them with `uv run --locked pytest -m training_smoke`. Longer convergence tests remain available with `uv run --locked pytest -m "training and not training_smoke"`.
 
-## Data and manuscript evidence
+## Data and reference results
 
 Worlds and checkpoints are hosted on [Hugging Face](https://huggingface.co/datasets/kurbanintelligencelab/stemgym/tree/aa12b7380fed7a4362a18aa67df1ea135f7e15ff). Downloads are pinned to that revision and checked against SHA-256 hashes before publication to the local cache. Existing mismatched files cause an error and are not overwritten.
 

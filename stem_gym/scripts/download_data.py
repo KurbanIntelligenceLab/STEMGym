@@ -1,4 +1,4 @@
-"""Download and verify manuscript worlds and analyst checkpoints."""
+"""Download and verify benchmark worlds and analyst checkpoints."""
 import argparse
 from pathlib import Path
 from stem_gym.data import download_verified, release_manifest

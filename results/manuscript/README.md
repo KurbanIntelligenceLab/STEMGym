@@ -1,4 +1,4 @@
-# Preserved manuscript evidence
+# Reference results and provenance
 
 `preservation.json` records SHA-256 identities for the reference results, evaluator, and source archive. `original_source.zip` contains the source, tests, reproduction scripts, and dependency metadata used for the reference study, with a per-file integrity manifest.
 
