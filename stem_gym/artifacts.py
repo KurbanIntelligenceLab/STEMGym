@@ -22,7 +22,7 @@ def verify_preservation(evidence: Path) -> dict:
     for name, digest in manifest["files"].items():
         if hashlib.sha256((evidence / name).read_bytes()).hexdigest() != digest:
             raise ValueError(f"Preserved evidence changed: {name}")
-    with zipfile.ZipFile(evidence / "original_source.zip") as archive:
+    with zipfile.ZipFile(evidence / "reference_source.zip") as archive:
         sources = json.loads(archive.read("SOURCE_MANIFEST.json"))
         for name, digest in sources.items():
             if hashlib.sha256(archive.read(name)).hexdigest() != digest:
