@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "development/generated"
+OUT = ROOT / "results/generated"
 HERE = Path(__file__).resolve().parent
 REPRO_OUT = HERE
 plt.rcParams.update(

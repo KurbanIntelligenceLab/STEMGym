@@ -12,7 +12,7 @@ from scipy.signal import find_peaks
 
 ROOT = Path(__file__).resolve().parents[1]
 HERE = Path(__file__).resolve().parent
-OUTPUT = ROOT / "development/verification"
+OUTPUT = ROOT / "results/verification"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 REV = "aa12b7380fed7a4362a18aa67df1ea135f7e15ff"
 URL = f"https://huggingface.co/api/datasets/kurbanintelligencelab/stemgym/revision/{REV}?blobs=true"

@@ -2,21 +2,56 @@
   "@context": {
     "@language": "en",
     "@vocab": "https://schema.org/",
-    "sc": "https://schema.org/",
+    "citeAs": "cr:citeAs",
+    "column": "cr:column",
+    "conformsTo": "dct:conformsTo",
     "cr": "http://mlcommons.org/croissant/",
     "rai": "http://mlcommons.org/croissant/RAI/",
-    "dct": "http://purl.org/dc/terms/"
+    "data": {
+      "@id": "cr:data",
+      "@type": "@json"
+    },
+    "dataType": {
+      "@id": "cr:dataType",
+      "@type": "@vocab"
+    },
+    "dct": "http://purl.org/dc/terms/",
+    "examples": {
+      "@id": "cr:examples",
+      "@type": "@json"
+    },
+    "extract": "cr:extract",
+    "field": "cr:field",
+    "fileProperty": "cr:fileProperty",
+    "fileObject": "cr:fileObject",
+    "fileSet": "cr:fileSet",
+    "format": "cr:format",
+    "includes": "cr:includes",
+    "isLiveDataset": "cr:isLiveDataset",
+    "jsonPath": "cr:jsonPath",
+    "key": "cr:key",
+    "md5": "cr:md5",
+    "parentField": "cr:parentField",
+    "path": "cr:path",
+    "recordSet": "cr:recordSet",
+    "references": "cr:references",
+    "regex": "cr:regex",
+    "repeated": "cr:repeated",
+    "replace": "cr:replace",
+    "sc": "https://schema.org/",
+    "separator": "cr:separator",
+    "source": "cr:source",
+    "subField": "cr:subField",
+    "transform": "cr:transform",
+    "wd": "https://www.wikidata.org/wiki/"
   },
   "@type": "sc:Dataset",
   "dct:conformsTo": "http://mlcommons.org/croissant/1.0",
   "name": "STEMGym",
-  "description": "STEMGym provides 15 simulated STEM worlds across five material systems. The manuscript core comprises 13 coordinate-bounds-consistent worlds and 13,600 tiles; two additional records have inconsistent field bounds. Coordinate bounds do not establish physical calibration. Three analyst checkpoints support the 220-episode defect-census reference evaluation.",
+  "description": "STEMGym provides 15 simulated STEM worlds across five material systems. The benchmark core comprises 13 coordinate-bounds-consistent worlds and 13,600 tiles; two additional records have inconsistent field bounds. Coordinate bounds do not establish physical calibration. Three analyst checkpoints support the 220-episode defect-census reference evaluation. The Croissant record set exposes the file inventory, not individual HDF5 image arrays.",
   "url": "https://huggingface.co/datasets/kurbanintelligencelab/stemgym",
   "license": "https://creativecommons.org/licenses/by/4.0/",
   "version": "aa12b7380fed7a4362a18aa67df1ea135f7e15ff",
-  "datePublished": "2026-04-02",
-  "dateCreated": "2025-12-01",
-  "dateModified": "2026-04-02",
   "inLanguage": "en",
   "isLiveDataset": false,
   "keywords": [
@@ -54,242 +89,101 @@
     "name": "Kurban Intelligence Lab"
   },
   "cr:citeAs": "@misc{stemgym2026, title={STEMGym: Benchmarking Sequential Decision-Making under Dose Budgets in Autonomous Electron Microscopy}, author={Polat, Can and Kurban, Mustafa and Serpedin, Erchin and Kurban, Hasan}, year={2026}}",
+  "dateModified": "2026-10-13",
   "distribution": [
     {
-      "@type": "cr:FileSet",
-      "@id": "world-files",
-      "name": "world-files",
-      "description": "Simulated STEM specimen worlds as HDF5 files. 5 materials (SrTiO3, BaTiO3, SiGe, GaN, Pt nanoparticles) at 3 difficulty levels (easy, medium, hard), plus test and replay worlds.",
-      "containedIn": {
-        "@id": "hf-repo"
-      },
-      "encodingFormat": "application/x-hdf5",
-      "cr:includes": "worlds/*.h5"
-    },
-    {
-      "@type": "cr:FileSet",
-      "@id": "main-checkpoints",
-      "name": "main-checkpoints",
-      "description": "Reference atom finder, defect classifier and phase identifier checkpoints; exact file identities are recorded in results/manuscript/release_manifest.json.",
-      "containedIn": {
-        "@id": "hf-repo"
-      },
-      "encodingFormat": "application/octet-stream",
-      "cr:includes": "checkpoints/*.pt"
-    },
-    {
       "@type": "cr:FileObject",
-      "@id": "hf-repo",
-      "name": "hf-repo",
-      "description": "HuggingFace dataset repository.",
-      "contentUrl": "https://huggingface.co/datasets/kurbanintelligencelab/stemgym/tree/aa12b7380fed7a4362a18aa67df1ea135f7e15ff",
-      "encodingFormat": "git+https"
+      "@id": "release-inventory",
+      "name": "release_inventory.csv",
+      "description": "Pinned file identities and roles for the benchmark data and reference checkpoints.",
+      "contentUrl": "https://huggingface.co/datasets/kurbanintelligencelab/stemgym/resolve/main/release_inventory.csv",
+      "encodingFormat": "text/csv",
+      "sha256": "1c27c750a6f42243662a3a59b8a27e755c398d5976b7f72eaa017c925b971528"
     }
   ],
   "recordSet": [
     {
       "@type": "cr:RecordSet",
-      "@id": "world-metadata",
-      "name": "world-metadata",
-      "description": "Per-world metadata stored in HDF5 /metadata/ group.",
+      "@id": "files",
+      "name": "files",
+      "description": "Twenty file records: 15 material worlds, two test fixtures, and three analyst checkpoints.",
       "field": [
         {
           "@type": "cr:Field",
-          "@id": "world-metadata/filename",
-          "name": "filename",
-          "description": "World HDF5 filename.",
+          "@id": "files/path",
+          "name": "path",
+          "description": "Path inside the pinned dataset repository.",
           "dataType": "sc:Text",
           "source": {
-            "fileSet": {
-              "@id": "world-files"
+            "fileObject": {
+              "@id": "release-inventory"
             },
             "extract": {
-              "fileProperty": "filename"
+              "column": "path"
             }
           }
         },
         {
           "@type": "cr:Field",
-          "@id": "world-metadata/pixel_size_nm",
-          "name": "pixel_size_nm",
-          "description": "Physical pixel size in nanometers.",
-          "dataType": "sc:Float"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-metadata/tile_size_px",
-          "name": "tile_size_px",
-          "description": "Tile dimensions in pixels (128).",
-          "dataType": "sc:Integer"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-metadata/grid_shape",
-          "name": "grid_shape",
-          "description": "Grid dimensions as (rows, cols).",
-          "dataType": "sc:Text"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-metadata/fov_nm",
-          "name": "fov_nm",
-          "description": "Field of view in nanometers.",
-          "dataType": "sc:Float"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-metadata/scenario",
-          "name": "scenario",
-          "description": "Material/scenario identifier.",
-          "dataType": "sc:Text"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-metadata/difficulty",
-          "name": "difficulty",
-          "description": "Difficulty level: easy, medium, or hard.",
-          "dataType": "sc:Text"
-        }
-      ]
-    },
-    {
-      "@type": "cr:RecordSet",
-      "@id": "world-images",
-      "name": "world-images",
-      "description": "STEM image data stored in each HDF5 world file.",
-      "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "world-images/overview",
-          "name": "overview",
-          "description": "Low-magnification overview image of the full specimen, stored at HDF5 path /overview. Shape: (H, W) float32.",
-          "dataType": "sc:ImageObject"
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "world-images/tiles",
-          "name": "tiles",
-          "description": "High-resolution STEM-HAADF tile images stored at HDF5 path /tiles/{row}_{col}. Each tile is (128, 128) float32 normalized. Tiles arranged in 8x8 grid with 4px overlap (stride=124).",
-          "dataType": "sc:ImageObject",
-          "repeated": true
-        }
-      ]
-    },
-    {
-      "@type": "cr:RecordSet",
-      "@id": "ground-truth",
-      "name": "ground-truth",
-      "description": "Ground-truth annotations stored in each HDF5 world file at /ground_truth/.",
-      "field": [
-        {
-          "@type": "cr:Field",
-          "@id": "ground-truth/atom_positions",
-          "name": "atom_positions",
-          "description": "Atomic column positions in nanometers. Shape: (N, 2) float64.",
-          "dataType": "sc:Float",
-          "repeated": true
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "ground-truth/atom_types",
-          "name": "atom_types",
-          "description": "Atom type labels: 0=pristine, 1=vacancy, 2=substitution. Shape: (N,) int.",
-          "dataType": "sc:Integer",
-          "repeated": true
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "ground-truth/defect_mask",
-          "name": "defect_mask",
-          "description": "Boolean mask indicating defective atoms. Shape: (N,) bool.",
-          "dataType": "sc:Boolean",
-          "repeated": true
-        },
-        {
-          "@type": "cr:Field",
-          "@id": "ground-truth/defect_types",
-          "name": "defect_types",
-          "description": "Defect type strings: pristine, vacancy, or substitution. Shape: (N,) str.",
+          "@id": "files/role",
+          "name": "role",
+          "description": "Role in the benchmark release.",
           "dataType": "sc:Text",
-          "repeated": true
+          "source": {
+            "fileObject": {
+              "@id": "release-inventory"
+            },
+            "extract": {
+              "column": "role"
+            }
+          }
         },
         {
           "@type": "cr:Field",
-          "@id": "ground-truth/phase_map",
-          "name": "phase_map",
-          "description": "Phase map as integer labels. Shape: (H, W) int32. Optional, present for multi-phase materials (BaTiO3).",
-          "dataType": "cr:SegmentationMask"
-        }
-      ]
-    },
-    {
-      "@type": "cr:RecordSet",
-      "@id": "valid-region",
-      "name": "valid-region",
-      "description": "Boolean mask at /valid_region indicating which pixels contain valid specimen data. Shape: (H, W) bool.",
-      "field": [
+          "@id": "files/bytes",
+          "name": "bytes",
+          "description": "File size in bytes.",
+          "dataType": "sc:Integer",
+          "source": {
+            "fileObject": {
+              "@id": "release-inventory"
+            },
+            "extract": {
+              "column": "bytes"
+            }
+          }
+        },
         {
           "@type": "cr:Field",
-          "@id": "valid-region/mask",
-          "name": "mask",
-          "description": "Per-pixel validity mask for the specimen grid.",
-          "dataType": "sc:Boolean",
-          "repeated": true
+          "@id": "files/sha256",
+          "name": "sha256",
+          "description": "SHA-256 of the original file bytes.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "release-inventory"
+            },
+            "extract": {
+              "column": "sha256"
+            }
+          }
+        },
+        {
+          "@type": "cr:Field",
+          "@id": "files/download_url",
+          "name": "download_url",
+          "description": "Download URL at the pinned reference revision.",
+          "dataType": "sc:Text",
+          "source": {
+            "fileObject": {
+              "@id": "release-inventory"
+            },
+            "extract": {
+              "column": "download_url"
+            }
+          }
         }
       ]
     }
-  ],
-  "rai:hasSyntheticData": true,
-  "rai:syntheticDataGeneration": "All images and ground-truth labels are synthetically generated. Crystal structures are built with pymatgen from Materials Project entries; defects (vacancies, substitutions, phase boundaries, nanoparticle morphologies) are introduced programmatically; STEM-HAADF images are simulated with the abTEM multislice code using frozen-phonon thermal diffuse scattering at 200 keV with 21 mrad convergence and 68-200 mrad HAADF detection. Poisson noise is added at material-specific dose levels (1e3-1e4 e-/A^2). No real experimental data is included.",
-  "rai:dataCollection": "All specimen data is computationally simulated. Crystal structures were built with pymatgen from Materials Project entries, defects were introduced programmatically (vacancies, substitutions, phase boundaries, nanoparticles), and STEM-HAADF images were simulated using the abTEM multislice code with frozen-phonon approximation. No real experimental data or human subjects are involved.",
-  "rai:dataCollectionType": [
-    "Experiments",
-    "Software Collection"
-  ],
-  "rai:dataCollectionRawData": "Raw simulation outputs are multislice STEM-HAADF images computed by abTEM. These are post-processed into 128x128 tiles with Poisson noise applied at material-specific dose levels (1e3-1e4 e-/A^2). Ground truth atom positions and defect labels are derived directly from the input crystal structures.",
-  "rai:dataCollectionTimeframe": "2025-06-01/2026-01-15",
-  "rai:dataCollectionMissingData": "No missing data. All 15 material-difficulty combinations are complete. Each world contains a full 8x8 tile grid and exhaustive ground-truth annotations for all atoms in the field of view.",
-  "rai:dataPreprocessingProtocol": [
-    "STEM-HAADF images simulated via abTEM multislice with frozen-phonon thermal diffuse scattering.",
-    "Images normalized to [0, 1] range per tile.",
-    "Poisson noise applied at dose levels corresponding to difficulty (easy=1e4, medium=5e3, hard=1e3 e-/A^2).",
-    "Tiles extracted on 124-pixel stride with 4-pixel overlap from full simulated field of view."
-  ],
-  "rai:dataAnnotationProtocol": "Ground truth is deterministic: atom positions, types, and defect labels are derived directly from the input crystal structures used for simulation. Phase maps are computed from the known crystal phase of each unit cell. No manual annotation was performed.",
-  "rai:dataAnnotationPlatform": [
-    "Automated (simulation-derived)"
-  ],
-  "rai:dataAnnotationAnalysis": [
-    "Ground truth is exact by construction since labels are derived from the simulation input, not from the output images."
-  ],
-  "rai:annotationsPerItem": "Every atom in each world's field of view is annotated with position (nm), type (pristine/vacancy/substitution), and defect status. Phase maps cover every pixel.",
-  "rai:machineAnnotationTools": [
-    "abTEM (multislice STEM simulation)",
-    "pymatgen (crystal structure generation)",
-    "ASE (atomic simulation environment)"
-  ],
-  "rai:personalSensitiveInformation": [
-    "Not applicable. This dataset contains only simulated materials science images with no personal or sensitive information."
-  ],
-  "rai:dataSocialImpact": "This benchmark advances autonomous electron microscopy, potentially accelerating materials discovery for energy, electronics, and structural applications. No negative social impacts are anticipated from simulated microscopy data.",
-  "rai:dataBiases": [
-    "Simulation bias: abTEM frozen-phonon approximation may not capture all real-world imaging artifacts (drift, contamination, detector nonlinearity).",
-    "Material selection bias: only 5 material systems are represented, all crystalline or nanoparticulate. Amorphous, biological, and polymeric materials are not covered.",
-    "Defect distribution bias: defect concentrations and spatial distributions are synthetically designed and may not match real-world statistical distributions."
-  ],
-  "rai:dataLimitations": [
-    "Simulated images lack experimental artifacts such as sample drift, beam damage accumulation, hydrocarbon contamination, and detector noise beyond Poisson statistics.",
-    "Fixed field of view per material; does not test multi-scale navigation across orders of magnitude.",
-    "Ground truth assumes perfect knowledge of the atomic structure, which is unavailable in real experiments.",
-    "Only HAADF-STEM imaging mode is simulated; other modalities (ABF, DPC, EELS, EDS) are not included."
-  ],
-  "rai:dataUseCases": [
-    "Benchmarking autonomous STEM microscopy agents on dose-efficient specimen characterization.",
-    "Evaluating navigation, perception, and analysis strategies for automated microscopy.",
-    "Training and testing reinforcement learning agents for scientific instrument control.",
-    "Comparing human and AI performance on microscopy tasks via the included human baseline interface."
-  ],
-  "rai:dataReleaseMaintenancePlan": "Dataset is versioned and archived. New material systems or difficulty levels may be added in future versions. Bug fixes and corrections will be released as point versions with changelogs.",
-  "rai:dataImputationProtocol": "No imputation is performed. All data values are computed deterministically from simulation.",
-  "rai:dataManipulationProtocol": "No post-hoc manipulation. Tile images and ground truth are direct outputs of the simulation pipeline."
+  ]
 }

@@ -183,7 +183,6 @@ class TestTraining:
         dataset = TileDataset([TEST_WORLD], augment=True)
         assert len(dataset) > 0, "No tiles loaded from test world"
 
-        # Train with small models for speed
         atom_finder, _ = train_atom_finder(
             dataset, n_members=2, epochs=15, batch_size=4,
             lr=1e-3, device="cpu",
@@ -254,8 +253,6 @@ class TestTraining:
             recall = tp / max(tp + fn, 1)
             f1 = 2 * precision * recall / max(precision + recall, 1e-6)
 
-            # Target: >80% F1 (the plan says >80% atom detection)
-            # On fake world with clear Gaussian blobs, this is achievable
             assert f1 > 0.5, (
                 f"AtomFinder F1={f1:.3f} (P={precision:.3f}, R={recall:.3f}). "
                 f"Target: >0.5 on fake world"

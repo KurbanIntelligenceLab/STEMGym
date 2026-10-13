@@ -152,7 +152,7 @@ def test_manuscript_evidence_preserved():
     assert verify_preservation(ROOT / "results/manuscript")["evidence_files"] >= 10
     for path in [
         "results/manuscript/reference_results.json",
-        "development/final_manuscript_mlst/figure1.pdf",
+        "development/protected.pdf",
     ]:
         with pytest.raises(ValueError):
             writable_output(ROOT / path, ROOT)

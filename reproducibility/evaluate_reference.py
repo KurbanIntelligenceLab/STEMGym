@@ -47,7 +47,7 @@ def main():
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--seeds", type=int, default=10)
     p.add_argument(
-        "--output", type=Path, default=ROOT / "development/runs/reference.json"
+        "--output", type=Path, default=ROOT / "results/runs/reference.json"
     )
     a = p.parse_args()
     if a.seeds < 1 or a.workers < 1:

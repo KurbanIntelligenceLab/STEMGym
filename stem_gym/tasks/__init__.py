@@ -35,7 +35,7 @@ class Task(ABC):
 
 @dataclass
 class DummyTask(Task):
-    """Placeholder task that always returns 0. Used for env testing."""
+    """Zero-score task for environment tests."""
 
     @property
     def name(self) -> str:

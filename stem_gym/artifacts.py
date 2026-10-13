@@ -8,11 +8,11 @@ import zipfile
 
 def writable_output(path: Path, root: Path) -> Path:
     resolved = path.resolve()
-    for directory in ("results/manuscript", "development/final_manuscript_mlst"):
+    for directory in ("results/manuscript", "development"):
         protected = (root / directory).resolve()
         if resolved == protected or protected in resolved.parents:
             raise ValueError(
-                f"Refusing to overwrite preserved manuscript files: {resolved}"
+                f"Refusing to overwrite protected files: {resolved}"
             )
     return resolved
 

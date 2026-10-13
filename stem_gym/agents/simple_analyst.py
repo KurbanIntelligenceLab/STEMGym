@@ -1,7 +1,6 @@
 """SimpleAnalyst: scipy-based atom finder and defect classifier.
 
-Fallback/baseline analyst used by baselines before the U-Net analyst
-(Phase 4) is available. Uses peak_local_max for atom detection and
+Uses peak_local_max for atom detection and
 intensity thresholding for defect classification.
 """
 

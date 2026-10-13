@@ -1,4 +1,4 @@
-"""Smoke tests for STEMEnv: Phase 1 verification."""
+"""Environment smoke tests."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Tests for Phase 6: Replay dataset and agents on replay data."""
+"""Replay world and agent integration tests."""
 
 from __future__ import annotations
 
