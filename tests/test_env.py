@@ -21,7 +21,7 @@ TEST_WORLD = Path(__file__).parent.parent / "data" / "simulated" / "test_world.h
 def world_path():
     """Ensure test world exists."""
     if not TEST_WORLD.exists():
-        pytest.skip("Test world not generated. Run: python stem_gym/scripts/generate_worlds/generate_test_world.py")
+        pytest.skip("Test fixture missing. Run: uv run --locked python reproducibility/prepare_test_data.py")
     return TEST_WORLD
 
 

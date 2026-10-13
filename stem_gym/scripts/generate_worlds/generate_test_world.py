@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate a fake HDF5 world for testing — no abTEM dependency.
+"""Generate a synthetic HDF5 world from Gaussian lattice images for testing.
 
 Creates a 1024x1024 lattice of Gaussian blobs with planted vacancies
 and substitutions. Produces ground truth labels compatible with the
 World class.
 
 Usage:
-    python stem_gym/scripts/generate_worlds/generate_test_world.py [--output data/simulated/test_world.h5]
+    uv run --locked python stem_gym/scripts/generate_worlds/generate_test_world.py [--output data/simulated/test_world.h5]
 """
 
 from __future__ import annotations
@@ -154,7 +154,7 @@ def generate_world(
     substitution_rate: float = 0.02,
     seed: int = 42,
 ) -> None:
-    """Generate a complete fake HDF5 world."""
+    """Generate a complete synthetic HDF5 world."""
     rng = np.random.default_rng(seed)
 
     print(f"Generating {world_size}x{world_size} world...")
@@ -185,7 +185,7 @@ def generate_world(
     from scipy.ndimage import zoom as scipy_zoom
     overview = scipy_zoom(defect_image, 0.25, order=1)
 
-    # Valid region: all True for fake world
+    # Valid region: all True for synthetic world
     valid_region = np.ones((world_size, world_size), dtype=bool)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

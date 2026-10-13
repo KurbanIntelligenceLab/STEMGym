@@ -6,9 +6,11 @@ The benchmark includes simulated specimen worlds, image-analysis models, and rep
 
 ## Installation with uv
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run from the repository root:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then clone the repository and install the locked environment:
 
 ```sh
+git clone https://github.com/KurbanIntelligenceLab/STEMGym.git
+cd STEMGym
 uv sync --locked
 uv run --locked python reproducibility/prepare_test_data.py
 uv run --locked pytest -m "not slow and not training"
@@ -70,8 +72,8 @@ The evaluator resumes one JSON file per run. It refuses to resume when its sourc
 | `stem_gym/baselines/` | Seeded action selection and acquisition feedback |
 | `stem_gym/runner.py` | Shared acquire → observe/analyze → score loop |
 | `stem_gym/evaluation.py` | Reference configuration and policy/analyst composition |
-| `stem_gym/scoring.py`, `tasks/`, `metrics.py` | Ground-truth selection and scoring |
-| `stem_gym/data.py`, `scripts/` | Verified downloads, training and generation |
+| `stem_gym/scoring.py`, `stem_gym/tasks/`, `stem_gym/metrics.py` | Ground-truth selection and scoring |
+| `stem_gym/data.py`, `stem_gym/scripts/` | Verified downloads, training and generation |
 | `reproducibility/` | Verification, figure generation, auditing and source packaging |
 | `results/manuscript/` | Reference results, integrity records, and source snapshot |
 

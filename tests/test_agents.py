@@ -182,9 +182,9 @@ class TestRunner:
 # ---- Baseline ordering test ----
 
 class TestBaselineOrdering:
-    """Verify baseline ordering on fake world.
+    """Verify baseline ordering on synthetic world.
 
-    On the uniform fake world, all strategies produce similar DEC-AUC
+    On the uniform synthetic world, all strategies produce similar DEC-AUC
     because the spatial structure is homogeneous. The key verifications:
 
     1. All agents produce positive DEC-AUC (they're actually scoring)

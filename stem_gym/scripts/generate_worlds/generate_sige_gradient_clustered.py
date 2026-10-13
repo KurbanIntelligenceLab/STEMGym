@@ -12,7 +12,7 @@ its distance from the quadrant center, then Si→Ge substitution is
 stochastic based on that probability.
 
 Usage:
-    python stem_gym/scripts/generate_worlds/generate_sige_gradient_clustered.py [--difficulty easy|medium|hard]
+    uv run --locked --extra sim python stem_gym/scripts/generate_worlds/generate_sige_gradient_clustered.py [--difficulty easy|medium|hard]
                                                              [--output data/simulated/sige_gradient_clustered.h5]
                                                              [--device cpu|gpu]
                                                              [--seed 42]

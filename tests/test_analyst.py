@@ -159,7 +159,7 @@ class TestAnalyst:
 class TestTraining:
     """Test that training pipeline works and produces reasonable models.
 
-    These tests use the fake test world (Gaussian blobs with planted
+    These tests use the synthetic test world (Gaussian blobs with planted
     defects) which is much simpler than real STEM data. The accuracy
     targets are adjusted accordingly.
     """
@@ -167,7 +167,7 @@ class TestTraining:
     @pytest.fixture(scope="class")
     @classmethod
     def trained_models(cls):
-        """Train all models on the fake test world (shared across class)."""
+        """Train all models on the synthetic test world (shared across class)."""
         if not TEST_WORLD.exists():
             pytest.skip("Test world not generated")
 
@@ -255,7 +255,7 @@ class TestTraining:
 
             assert f1 > 0.5, (
                 f"AtomFinder F1={f1:.3f} (P={precision:.3f}, R={recall:.3f}). "
-                f"Target: >0.5 on fake world"
+                f"Target: >0.5 on synthetic world"
             )
 
     def test_defect_classifier_accuracy(self, trained_models):
@@ -285,7 +285,6 @@ class TestTraining:
 
         accuracy = correct / max(total, 1)
         # Most patches are "pristine" (class 0), so accuracy should be decent
-        # Target: >50% is reasonable on imbalanced fake data
         assert accuracy > 0.4, (
             f"DefectClassifier accuracy={accuracy:.3f}. Target: >0.4"
         )
