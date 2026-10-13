@@ -81,10 +81,12 @@ class SimpleAnalyst:
             AnalysisResult with detected atoms and classification.
         """
         if tile.max() <= 0:
-            return AnalysisResult(
+            result = AnalysisResult(
                 atom_positions=np.empty((0, 2)),
                 atom_intensities=np.empty(0),
             )
+            self._tile_results.append(result)
+            return result
 
         # Smooth for peak detection
         smoothed = gaussian_filter(tile.astype(np.float64), sigma=self.smooth_sigma)
@@ -98,11 +100,13 @@ class SimpleAnalyst:
         )
 
         if len(coords) == 0:
-            return AnalysisResult(
+            result = AnalysisResult(
                 atom_positions=np.empty((0, 2)),
                 atom_intensities=np.empty(0),
                 mean_intensity=float(tile.mean()),
             )
+            self._tile_results.append(result)
+            return result
 
         # Get intensities at peak positions
         intensities = np.array([tile[r, c] for r, c in coords], dtype=np.float32)
@@ -178,3 +182,7 @@ class SimpleAnalyst:
 
         # Simple threshold: larger spacing → phase 1
         return 1 if spacing > self.min_distance * 1.5 else 0
+
+    @property
+    def analysed_tiles(self) -> int:
+        return len(self._tile_results)

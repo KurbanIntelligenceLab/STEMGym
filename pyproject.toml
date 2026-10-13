@@ -9,25 +9,27 @@ description = "Gym-compatible benchmark for autonomous STEM microscopy"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [
-    {name = "Can Polat", email = "can.polat0@yahoo.com"},
-]
+authors = [{name = "Can Polat", email = "can.polat0@yahoo.com"}]
 
 dependencies = [
     "gymnasium>=0.29",
     "numpy>=1.24",
     "h5py>=3.8",
     "scipy>=1.10",
+    # SciPy 1.15 macOS wheels fail to load on newer macOS: scipy/scipy#25635.
+    "scipy==1.14.1; python_version < '3.11' and sys_platform == 'darwin'",
     "torch>=2.0",
     "botorch>=0.9",
     "matplotlib>=3.7",
-    "pyyaml>=6.0",
     "scikit-image>=0.21",
 ]
 
+[project.scripts]
+stemgym-download = "stem_gym.scripts.download_data:main"
+
 [project.urls]
 Repository = "https://github.com/KurbanIntelligenceLab/STEMGym"
-Dataset = "https://huggingface.co/datasets/johnpolat/STEMGym"
+Dataset = "https://huggingface.co/datasets/kurbanintelligencelab/stemgym"
 
 [project.optional-dependencies]
 sim = [
@@ -35,34 +37,32 @@ sim = [
     "pymatgen>=2023.5",
     "mp-api>=0.33",
     "ase>=3.22",
-    "cupy-cuda12x>=13.0",
 ]
-replay = [
-    "py4dstem>=0.14",
-]
-human = [
-    "gradio>=4.0",
-]
-rl = [
-    "stable-baselines3>=2.0",
-]
-vlm = [
-    "openai>=1.0",
-    "pillow>=10.0",
-]
+cuda = ["cupy-cuda12x>=13.0; sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+[dependency-groups]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "ruff>=0.11",
 ]
-
-[project.scripts]
-stemgym = "experiments.run_benchmark:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
+    "training_smoke: bounded one-epoch training and checkpoint checks",
+    "training: trains neural networks on software fixtures",
     "slow: marks tests that run abTEM simulations (deselect with '-m \"not slow\"')",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["stem_gym"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/stem_gym", "/tests", "/reproducibility", "/results/manuscript", "/README.md", "/LICENSE", "/pyproject.toml", "/uv.lock", "/croissant.json", "/.github", "/.python-version", "/.gitignore"]
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"results/manuscript/release_manifest.json" = "stem_gym/data/release_manifest.json"

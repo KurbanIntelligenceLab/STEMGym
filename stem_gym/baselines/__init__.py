@@ -17,7 +17,7 @@ class Agent(ABC):
     """Base class for STEMGym agents (baselines and multi-agent)."""
 
     @abstractmethod
-    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any], *, seed: int | None = None) -> None:
         """Called at episode start after env.reset()."""
 
     @abstractmethod
@@ -27,6 +27,16 @@ class Agent(ABC):
         Returns:
             Action dict compatible with STEMEnv.action_space.
         """
+
+    def observe(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+        """Consume a successful acquisition before the evaluator scores it."""
+        count = info.get("acquisitions", 0)
+        if count > self._observed_acquisitions:
+            self.analyst.analyze_tile(obs["tile"])
+            self._observed_acquisitions = count
+
+    def get_findings(self) -> dict[str, Any]:
+        raise NotImplementedError("Agents must provide accumulated findings")
 
     def _make_done_action(self) -> dict[str, Any]:
         from stem_gym.envs.stem_env import ActionType

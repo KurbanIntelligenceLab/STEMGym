@@ -1,33 +1,47 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
-
+    env:
+      UV_PYTHON: "3.14"
+      OMP_NUM_THREADS: "1"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Generate test world
-        run: python stem_gym/scripts/generate_worlds/generate_test_world.py
-
-      - name: Run tests
-        run: pytest -m "not slow" -v --tb=short
+          version: "0.10.8"
+          python-version: "3.14"
+          enable-cache: true
+      - run: uv sync --locked --python "3.14"
+      - run: uv pip check
+      - run: uv run --locked ruff check stem_gym tests reproducibility
+      - run: uv run --locked python reproducibility/prepare_test_data.py
+      - run: uv run --locked pytest -m "not slow and not training" -q
+      - run: uv run --locked python reproducibility/verify_reference.py
+      - run: uv build --out-dir development/dist
+      - run: uv run --locked python reproducibility/package_source.py
+  training-smoke:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      UV_PYTHON: "3.14"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.10.8"
+          python-version: "3.14"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run --locked python reproducibility/prepare_test_data.py
+      - run: uv run --locked pytest -m training_smoke -q

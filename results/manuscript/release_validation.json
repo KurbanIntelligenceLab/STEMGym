@@ -1,0 +1,978 @@
+{
+  "repository": "kurbanintelligencelab/stemgym",
+  "revision": "aa12b7380fed7a4362a18aa67df1ea135f7e15ff",
+  "records": [
+    {
+      "file": "checkpoints/atom_finder.pt",
+      "sha256": "a98f9f60584bd4c0a18828f4c8dc3254bfbf5bf624ea2a2392b8ce307de6cad9",
+      "bytes": 92556970,
+      "matches_release": true
+    },
+    {
+      "file": "checkpoints/defect_classifier.pt",
+      "sha256": "4491ff97578645daa4f0586d4b16f7f8cec63e881e4c6ec0bb61001eea4a8264",
+      "bytes": 1426180,
+      "matches_release": true
+    },
+    {
+      "file": "checkpoints/phase_identifier.pt",
+      "sha256": "b2d26ba3307827eea0e7b2ae3671edd0832aa8ea1a0ddf0a4d4e207a29ae2bb0",
+      "bytes": 7724106,
+      "matches_release": true
+    },
+    {
+      "file": "worlds/batio3_interface_easy.h5",
+      "sha256": "a25f2d8b1294eaf7daf61e3de13d6f07cccd837991a829440485e154f0bddb1d",
+      "bytes": 955321878,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "easy",
+        "fov_nm": [
+          99.82000000000001,
+          99.82000000000001
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "batio3_interface",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          4991,
+          4991
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.25090026855469,
+        99.62364959716797
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 7750125,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "phase_map"
+      ],
+      "defect_count": 186003,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        4991,
+        4991
+      ]
+    },
+    {
+      "file": "worlds/batio3_interface_hard.h5",
+      "sha256": "a6c9137c6ee4c21f372dd90a005e64163f250a8314791ba1960c1e860e9de875",
+      "bytes": 955321878,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "hard",
+        "fov_nm": [
+          99.82000000000001,
+          99.82000000000001
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "batio3_interface",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          4991,
+          4991
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.25090026855469,
+        99.62364959716797
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 7750125,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "phase_map"
+      ],
+      "defect_count": 69751,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        4991,
+        4991
+      ]
+    },
+    {
+      "file": "worlds/batio3_interface_medium.h5",
+      "sha256": "e1535bf06048c5f9f19cbdb9d629dbecb4b3782858fc529ceadc214c8d1f5e2c",
+      "bytes": 955321878,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "medium",
+        "fov_nm": [
+          99.82000000000001,
+          99.82000000000001
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "batio3_interface",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          4991,
+          4991
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.62364959716797,
+        99.62364959716797
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 7750125,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "phase_map"
+      ],
+      "defect_count": 139502,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        4991,
+        4991
+      ]
+    },
+    {
+      "file": "worlds/gan_easy.h5",
+      "sha256": "c7f081085921bef21f003da2620abcfc84b5633f77baf958116048eb36cdb5c6",
+      "bytes": 472914301,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "easy",
+        "fov_nm": [
+          49.78,
+          50.26
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "gan",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2489,
+          2513
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        50.17188262939453,
+        49.580997467041016
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 4402944,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "in_fraction_profile",
+        "phase_map"
+      ],
+      "defect_count": 550368,
+      "overview_shape": [
+        254,
+        256
+      ],
+      "mask_shape": [
+        2489,
+        2513
+      ]
+    },
+    {
+      "file": "worlds/gan_hard.h5",
+      "sha256": "e04c8ff171ad53f2805508d89aa0510e4598d594db2af6d225c597125ec76672",
+      "bytes": 469391741,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "hard",
+        "fov_nm": [
+          49.78,
+          50.26
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "gan",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2489,
+          2513
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        50.17188262939453,
+        49.580997467041016
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 4402944,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "in_fraction_profile",
+        "phase_map"
+      ],
+      "defect_count": 110073,
+      "overview_shape": [
+        254,
+        256
+      ],
+      "mask_shape": [
+        2489,
+        2513
+      ]
+    },
+    {
+      "file": "worlds/gan_medium.h5",
+      "sha256": "7e4b962a6a86851bf25807e484efe076b45edc87d44c9a8859d5d6f0f5448967",
+      "bytes": 470620541,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "medium",
+        "fov_nm": [
+          49.78,
+          50.26
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "gan",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2489,
+          2513
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        50.17188262939453,
+        49.580997467041016
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 4402944,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "in_fraction_profile",
+        "phase_map"
+      ],
+      "defect_count": 264176,
+      "overview_shape": [
+        254,
+        256
+      ],
+      "mask_shape": [
+        2489,
+        2513
+      ]
+    },
+    {
+      "file": "worlds/pt_nanoparticles_easy.h5",
+      "sha256": "cc4a96546f671602a80c13822217d621b7f2b3d771fbbe704547b89d5b71da8d",
+      "bytes": 134906992,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "easy",
+        "fov_nm": [
+          100.0,
+          100.0
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "pt_nanoparticles",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          5000,
+          5000
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        3.2534775733947754,
+        13.332779884338379
+      ],
+      "position_max": [
+        95.0839614868164,
+        81.69151306152344
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 8,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "particle_diameters_nm",
+        "particle_morphology_labels",
+        "particle_n_atoms"
+      ],
+      "defect_count": 8,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        5000,
+        5000
+      ]
+    },
+    {
+      "file": "worlds/pt_nanoparticles_hard.h5",
+      "sha256": "b597404e8de9a74f2904c782677c0756bf8e1a524110d623b1cf72baa79a356a",
+      "bytes": 134908816,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "hard",
+        "fov_nm": [
+          50.0,
+          50.0
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.01,
+        "scenario": "pt_nanoparticles",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          5000,
+          5000
+        ]
+      },
+      "positions_outside_field": 34,
+      "geometry_consistent": false,
+      "position_min": [
+        4.377858638763428,
+        4.1636199951171875
+      ],
+      "position_max": [
+        94.57301330566406,
+        95.45765686035156
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 40,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "particle_diameters_nm",
+        "particle_morphology_labels",
+        "particle_n_atoms"
+      ],
+      "defect_count": 40,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        5000,
+        5000
+      ]
+    },
+    {
+      "file": "worlds/pt_nanoparticles_medium.h5",
+      "sha256": "cd75a3b9edf8ef6c46a475e0d3cd3587d2b9ba5b0914326465f711426176b275",
+      "bytes": 134907676,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "medium",
+        "fov_nm": [
+          100.0,
+          100.0
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "pt_nanoparticles",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          5000,
+          5000
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        3.015986919403076,
+        14.176996231079102
+      ],
+      "position_max": [
+        96.82565307617188,
+        90.96746826171875
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 20,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "particle_diameters_nm",
+        "particle_morphology_labels",
+        "particle_n_atoms"
+      ],
+      "defect_count": 20,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        5000,
+        5000
+      ]
+    },
+    {
+      "file": "worlds/sige_gradient_clustered_easy.h5",
+      "sha256": "6a3e9671dbade7f9604c5bc58a8bb8c690de2d9cd59d6050200fbde9edca56e9",
+      "bytes": 156765028,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "easy",
+        "fov_nm": [
+          49.96,
+          49.96
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "sige_gradient_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2498,
+          2498
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        49.82942581176758,
+        49.82942581176758
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 1015680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "ge_fraction_2d",
+        "phase_map"
+      ],
+      "defect_count": 422724,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        2498,
+        2498
+      ]
+    },
+    {
+      "file": "worlds/sige_gradient_clustered_hard.h5",
+      "sha256": "044cf4f20bbd27cfff7cabc85f6e33ae7c5a15fd074d318e1f26f86fb0685774",
+      "bytes": 153979748,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "hard",
+        "fov_nm": [
+          49.96,
+          49.96
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "sige_gradient_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2498,
+          2498
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        49.82942581176758,
+        49.82942581176758
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 1015680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "ge_fraction_2d",
+        "phase_map"
+      ],
+      "defect_count": 75651,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        2498,
+        2498
+      ]
+    },
+    {
+      "file": "worlds/sige_gradient_clustered_medium.h5",
+      "sha256": "04d832ac239e2cef7b45e72bf050192fe0a8d75d06ec982068aefe56337142c9",
+      "bytes": 154946404,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "medium",
+        "fov_nm": [
+          49.96,
+          49.96
+        ],
+        "grid_shape": [
+          20,
+          20
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "sige_gradient_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          2498,
+          2498
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        49.82942581176758,
+        49.82942581176758
+      ],
+      "tile_count": 400,
+      "expected_tile_count": 400,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 1015680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types",
+        "ge_fraction_2d",
+        "phase_map"
+      ],
+      "defect_count": 197799,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        2498,
+        2498
+      ]
+    },
+    {
+      "file": "worlds/srtio3_clustered_easy.h5",
+      "sha256": "567ccd8acbea2e150a2d43b026a7682af21dc6b2d344463b2bdf49db1c055b9f",
+      "bytes": 927343756,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "easy",
+        "fov_nm": [
+          99.96000000000001,
+          99.96000000000001
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "srtio3_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          4998,
+          4998
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.77275085449219,
+        99.77275085449219
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 8519680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types"
+      ],
+      "defect_count": 255590,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        4998,
+        4998
+      ]
+    },
+    {
+      "file": "worlds/srtio3_clustered_hard.h5",
+      "sha256": "492d79474521b64ef6bd4ec055579545c460943323f5d55ac71fbc1c8988338e",
+      "bytes": 927443816,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "hard",
+        "fov_nm": [
+          50.08,
+          50.08
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.01,
+        "scenario": "srtio3_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          5008,
+          5008
+        ]
+      },
+      "positions_outside_field": 6376422,
+      "geometry_consistent": false,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.77275085449219,
+        99.77275085449219
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 8519680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types"
+      ],
+      "defect_count": 51118,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        5008,
+        5008
+      ]
+    },
+    {
+      "file": "worlds/srtio3_clustered_medium.h5",
+      "sha256": "1b24c02e1e526f4a5ed6060333faae93ff68b87f920a045371c6bf2b7587c576",
+      "bytes": 927343756,
+      "matches_release": true,
+      "metadata": {
+        "difficulty": "medium",
+        "fov_nm": [
+          99.96000000000001,
+          99.96000000000001
+        ],
+        "grid_shape": [
+          40,
+          40
+        ],
+        "overlap_px": 4,
+        "pixel_size_nm": 0.02,
+        "scenario": "srtio3_clustered",
+        "tile_size_px": 128,
+        "world_shape_px": [
+          4998,
+          4998
+        ]
+      },
+      "positions_outside_field": 0,
+      "geometry_consistent": true,
+      "position_min": [
+        0.0,
+        0.0
+      ],
+      "position_max": [
+        99.77275085449219,
+        99.77275085449219
+      ],
+      "tile_count": 1600,
+      "expected_tile_count": 1600,
+      "finite_tiles": true,
+      "correct_tile_shapes": true,
+      "tile_range": [
+        0.0,
+        1.0
+      ],
+      "atom_count": 8519680,
+      "aligned_annotation_lengths": true,
+      "finite_positions": true,
+      "ground_truth_fields": [
+        "atom_positions",
+        "atom_species",
+        "atom_types",
+        "defect_mask",
+        "defect_types"
+      ],
+      "defect_count": 153354,
+      "overview_shape": [
+        256,
+        256
+      ],
+      "mask_shape": [
+        4998,
+        4998
+      ]
+    }
+  ]
+}

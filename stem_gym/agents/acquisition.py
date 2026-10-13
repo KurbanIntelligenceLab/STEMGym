@@ -1,7 +1,4 @@
-"""Shared acquisition function dispatch for GP-based agents.
-
-Provides UCB, Expected Improvement (EI), and Thompson Sampling (TS)
-acquisition functions. Used by both Navigator (STEMAgent) and GPUCBAgent.
+"""Upper-confidence-bound acquisition used by the manuscript GP policies.
 """
 
 from __future__ import annotations
@@ -22,9 +19,9 @@ def evaluate_acquisition(
     Args:
         model: Fitted BoTorch SingleTaskGP model (in eval mode).
         candidates: (N, D) tensor of candidate points.
-        acq_func: One of "ucb", "ei", "ts".
+        acq_func: The supported value is "ucb".
         beta: UCB exploration parameter (only used for "ucb").
-        train_Y: Normalized training targets (only used for "ei" to get best_f).
+        train_Y: Unused compatibility argument.
 
     Returns:
         (N,) tensor of acquisition values (higher = better).
@@ -38,27 +35,4 @@ def evaluate_acquisition(
     if acq_func == "ucb":
         return mean + beta * std
 
-    elif acq_func == "ei":
-        # Expected Improvement: EI(x) = E[max(f(x) - f*, 0)]
-        # Normalize train_Y defensively — callers may pass raw values while
-        # the GP posterior operates in (manually) normalized space.
-        if train_Y is not None:
-            y_mean = train_Y.mean()
-            y_std = train_Y.std().clamp(min=1e-6)
-            best_f = ((train_Y - y_mean) / y_std).max()
-        else:
-            best_f = mean.max()
-        z = (mean - best_f) / std.clamp(min=1e-8)
-        # Use normal CDF/PDF approximation
-        normal = torch.distributions.Normal(0, 1)
-        ei = std * (z * normal.cdf(z) + normal.log_prob(z).exp())
-        return ei.clamp(min=0.0)
-
-    elif acq_func == "ts":
-        # Thompson Sampling: draw one sample from posterior
-        with torch.no_grad():
-            sample = posterior.rsample()  # (1, N, 1)
-        return sample.squeeze(-1).squeeze(0)
-
-    else:
-        raise ValueError(f"Unknown acquisition function: {acq_func!r}. Use 'ucb', 'ei', or 'ts'.")
+    raise ValueError(f"Unsupported acquisition function: {acq_func!r}; the manuscript uses 'ucb'.")

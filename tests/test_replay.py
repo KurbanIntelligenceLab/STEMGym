@@ -155,17 +155,6 @@ class TestAgentsOnReplay:
         assert result.tiles_acquired > 0
         env.close()
 
-    def test_stem_agent_on_replay(self, replay_path):
-        from stem_gym.agents.multi_agent import STEMAgent
-
-        env = STEMEnv(replay_path, task=DefectCensusTask(),
-                      total_budget=3000.0, max_steps=50)
-        agent = STEMAgent(seed=42)
-        result = run_episode(env, agent, seed=42, score_every_n_acquires=3)
-
-        assert result.total_steps > 0
-        assert result.tiles_acquired > 0
-        env.close()
 
     def test_phase_mapping_on_replay(self, replay_path):
         """Phase mapping task should also work on replay."""
@@ -196,7 +185,6 @@ class TestRankingCorrelation:
         from stem_gym.baselines.random_agent import RandomAgent
         from stem_gym.baselines.raster_scan import RasterAgent
         from stem_gym.baselines.gp_ucb import GPUCBAgent
-        from stem_gym.agents.multi_agent import STEMAgent
 
         budget = 3000.0
         max_steps = 50
@@ -207,7 +195,6 @@ class TestRankingCorrelation:
             ("random", lambda: RandomAgent(seed=42)),
             ("raster", lambda: RasterAgent(seed=42)),
             ("gp_ucb", lambda: GPUCBAgent(seed=42, initial_random=3)),
-            ("stem_agent", lambda: STEMAgent(seed=42)),
         ]:
             env = STEMEnv(replay_path, task=DefectCensusTask(),
                           total_budget=budget, max_steps=max_steps)

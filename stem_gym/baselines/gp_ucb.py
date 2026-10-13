@@ -4,7 +4,7 @@ Single-agent GP-UCB over the spatial (x, y) domain. Acquires at every
 navigated position. Models tile "interestingness" (intensity variance)
 as the objective to maximize — explores high-variance regions first.
 
-This is the primary single-agent baseline and the one STEMAgent must beat.
+This supplies the GP navigation used by the manuscript reference evaluator.
 """
 
 from __future__ import annotations
@@ -57,8 +57,12 @@ class GPUCBAgent(Agent):
         self._gp_model = None
         self._visited_set: set[tuple[int, int]] = set()
 
-    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any], *, seed: int | None = None) -> None:
+        torch.manual_seed(self.seed if seed is None else seed)
+        self.rng = np.random.default_rng(self.seed if seed is None else seed)
         self.analyst.reset()
+        self._observed_acquisitions = 0
+        self._geometry = info.get("geometry")
         self._X.clear()
         self._Y.clear()
         self._grid_shape = obs["visited_mask"].shape
@@ -77,14 +81,10 @@ class GPUCBAgent(Agent):
         from botorch.fit import fit_gpytorch_mll
         from gpytorch.mlls import ExactMarginalLogLikelihood
 
-        # GP fit cost is O(n^3) so CPU is fine at low n but becomes the
-        # bottleneck at n>~100 (high-budget runs). Use GPU when available;
-        # known caveat: PyTorch 2.5.x bundled CUDA kernels lack sm_120
-        # support, so RTX 5090 deployments may need to set the
-        # STEMGYM_FORCE_CPU_GP=1 env var to fall back to CPU.
         import os
-        _force_cpu = os.environ.get("STEMGYM_FORCE_CPU_GP") == "1"
-        _device = "cuda" if (torch.cuda.is_available() and not _force_cpu) else "cpu"
+
+        force_cpu = os.environ.get("STEMGYM_FORCE_CPU_GP") == "1"
+        _device = "cuda" if torch.cuda.is_available() and not force_cpu else "cpu"
         train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 
@@ -151,6 +151,8 @@ class GPUCBAgent(Agent):
 
     def _grid_to_nm(self, row: int, col: int) -> tuple[float, float]:
         """Convert grid indices to approximate nm coordinates."""
+        if self._geometry is not None:
+            return self._geometry.tile_to_nm(row, col)
         grid_h, grid_w = self._grid_shape
         x_nm = (col + 0.5) / grid_w * self._fov_nm[1]
         y_nm = (row + 0.5) / grid_h * self._fov_nm[0]
@@ -158,6 +160,8 @@ class GPUCBAgent(Agent):
 
     def _nm_to_grid(self, x_nm: float, y_nm: float) -> tuple[int, int]:
         """Convert nm coordinates to grid indices."""
+        if self._geometry is not None:
+            return self._geometry.nm_to_tile(x_nm, y_nm)
         grid_h, grid_w = self._grid_shape
         col = int(np.clip(x_nm / self._fov_nm[1] * grid_w, 0, grid_w - 1))
         row = int(np.clip(y_nm / self._fov_nm[0] * grid_h, 0, grid_h - 1))
@@ -195,27 +199,6 @@ class GPUCBAgent(Agent):
             # Acquire and analyze
             self._navigate_phase = True
 
-            # Analyze previous tile and record observation for GP
-            tile = obs.get("tile")
-            if tile is not None and tile.max() > 0:
-                result = self.analyst.analyze_tile(tile)
-                interestingness = self._tile_interestingness(tile)
-
-                pos = obs["position"]
-                row, col = self._nm_to_grid(float(pos[0]), float(pos[1]))
-                self._visited_set.add((row, col))
-
-                # Record for GP (normalized coordinates)
-                grid_h, grid_w = self._grid_shape
-                x_norm = row / max(grid_h - 1, 1)
-                y_norm = col / max(grid_w - 1, 1)
-                self._X.append([x_norm, y_norm])
-                self._Y.append(interestingness)
-
-                # Refit GP periodically
-                if len(self._X) >= self.initial_random and len(self._X) % 3 == 0:
-                    self._fit_gp()
-
             return {
                 "action_type": ActionType.ACQUIRE,
                 "position": obs["position"].copy(),
@@ -223,6 +206,29 @@ class GPUCBAgent(Agent):
                 "dwell": np.array([1.0], dtype=np.float32),
                 "finding_type": 0,
             }
+
+    def select_tile(self, obs: dict[str, np.ndarray]) -> tuple[int, int]:
+        """Select a tile using the current surrogate and visited mask."""
+        return self._nm_to_grid(*self._select_next_position(obs))
+
+    def update(self, tile: tuple[int, int], signal: float, *, fit: bool = True) -> None:
+        """Record a completed acquisition and refit every three acquisitions."""
+        row, col = tile
+        gh, gw = self._grid_shape
+        if not (0 <= row < gh and 0 <= col < gw) or not np.isfinite(signal):
+            raise ValueError("Invalid GP observation")
+        self._X.append([row / max(gh - 1, 1), col / max(gw - 1, 1)])
+        self._Y.append(float(signal))
+        self._visited_set.add(tile)
+        self._step = len(self._X)
+        if fit and len(self._X) >= self.initial_random and len(self._X) % 3 == 0:
+            self._fit_gp()
+
+    def observe(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+        count = info.get("acquisitions", 0)
+        if count > self._observed_acquisitions:
+            super().observe(obs, info)
+            self.update(info["tile_position"], self._tile_interestingness(obs["tile"]))
 
     def get_findings(self) -> dict[str, Any]:
         return {

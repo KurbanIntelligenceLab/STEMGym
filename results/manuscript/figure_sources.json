@@ -1,0 +1,29 @@
+{
+  "figure1_tiles": [
+    {
+      "world": "srtio3_clustered_easy",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "world": "batio3_interface_easy",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "world": "sige_gradient_clustered_easy",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "world": "gan_easy",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "world": "pt_nanoparticles_easy",
+      "row": 29,
+      "col": 12
+    }
+  ]
+}

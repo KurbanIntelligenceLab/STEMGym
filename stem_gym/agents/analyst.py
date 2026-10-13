@@ -7,6 +7,7 @@ the same interface as SimpleAnalyst (analyze_tile → AnalysisResult).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -70,6 +71,9 @@ class Analyst:
         if self.phase_identifier is not None:
             self.phase_identifier = self.phase_identifier.to(self.device).eval()
 
+        self._loaded_defect_classifier = self.defect_classifier
+        self._loaded_phase_identifier = self.phase_identifier
+
         # Track degenerate model detection (always predicts same class)
         self._defect_clf_check_count = 0
         self._defect_clf_pred_counts: dict[int, int] = {}
@@ -88,6 +92,8 @@ class Analyst:
         self._phase_model_predictions: dict[tuple[int, int], int] = {}
 
     def reset(self) -> None:
+        self.defect_classifier = self._loaded_defect_classifier
+        self.phase_identifier = self._loaded_phase_identifier
         self._tile_results.clear()
         self._all_atom_positions_nm.clear()
         self._all_defect_labels.clear()
@@ -100,7 +106,7 @@ class Analyst:
         self._phase_model_predictions.clear()
 
     @classmethod
-    def from_checkpoint(cls, checkpoint_dir: str | Path, device: str | None = None) -> "Analyst":
+    def from_checkpoint(cls, checkpoint_dir: str | Path, device: str | None = None, *, compile_models: bool = False) -> "Analyst":
         """Load trained models from a checkpoint directory.
 
         Expected files:
@@ -120,10 +126,8 @@ class Analyst:
             n_members = max(member_ids) + 1 if member_ids else 3
             atom_finder = AtomFinderEnsemble(n_members=n_members)
             atom_finder.load_state_dict(sd)
-            try:
+            if compile_models:
                 atom_finder = torch.compile(atom_finder)
-            except Exception:
-                pass
 
         defect_classifier = None
         if (cp / "defect_classifier.pt").exists():
@@ -133,10 +137,8 @@ class Analyst:
             n_classes = sd[fc_key].shape[0] if fc_key in sd else 4
             defect_classifier = DefectClassifierCNN(n_classes=n_classes)
             defect_classifier.load_state_dict(sd)
-            try:
+            if compile_models:
                 defect_classifier = torch.compile(defect_classifier)
-            except Exception:
-                pass
 
         phase_identifier = None
         if (cp / "phase_identifier.pt").exists():
@@ -145,10 +147,8 @@ class Analyst:
             n_phases = sd["fc.weight"].shape[0] if "fc.weight" in sd else 2
             phase_identifier = PhaseIdentifierResNet(n_phases=n_phases)
             phase_identifier.load_state_dict(sd)
-            try:
+            if compile_models:
                 phase_identifier = torch.compile(phase_identifier)
-            except Exception:
-                pass
 
         return cls(
             atom_finder=atom_finder,
@@ -532,3 +532,50 @@ class Analyst:
         for intensity, key in zip(self._phase_intensities, self._phase_tile_keys):
             result[key] = 0 if intensity <= median else 1
         return result
+
+    @property
+    def analysed_tiles(self) -> int:
+        return len(self._tile_results)
+
+    def get_findings(self, grid_shape: tuple[int, int]) -> dict[str, Any]:
+        # Phase map from corrected tile phases (Cohen's d significance test)
+        phase_map = None
+        corrected = self.get_corrected_tile_phases()
+        if corrected is not None:
+            gh, gw = grid_shape
+            phase_map = np.zeros((gh, gw), dtype=np.int32)
+            for (r, c), phase in corrected.items():
+                if 0 <= r < gh and 0 <= c < gw:
+                    phase_map[r, c] = phase
+
+        # Defect positions from analyst accumulated state
+        defect_positions = []
+        all_positions = self._all_atom_positions_nm
+        all_labels = self._all_defect_labels
+
+        if all_positions and all_labels:
+            offset = 0
+            for tile_pos in all_positions:
+                n = len(tile_pos)
+                for j in range(n):
+                    label_idx = offset + j
+                    if label_idx < len(all_labels):
+                        lbl = all_labels[label_idx]
+                        if lbl != "pristine":
+                            defect_positions.append({
+                                "position": (float(tile_pos[j, 0]), float(tile_pos[j, 1])),
+                                "type": lbl,
+                            })
+                offset += n
+
+        # Atom positions
+        atom_positions = None
+        if all_positions:
+            atom_positions = np.concatenate(all_positions, axis=0)
+
+        return {
+            "defect_census": self.get_defect_census(),
+            "defect_positions": defect_positions,
+            "phase_map": phase_map,
+            "atom_positions": atom_positions,
+        }

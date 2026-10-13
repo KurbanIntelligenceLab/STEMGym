@@ -1,0 +1,90 @@
+{
+  "srtio3_clustered_easy": {
+    "raster_heuristic": {
+      "mean": 0.04637755705955442,
+      "sample_sd": 0.0053858562490685935
+    },
+    "raster_trained": {
+      "mean": 0.4607489445890212,
+      "sample_sd": 0.0028578649577477777
+    },
+    "random_trained": {
+      "mean": 0.42205460162111574,
+      "sample_sd": 0.005652017502718065
+    },
+    "gp_intensity_trained": {
+      "mean": 0.4353226300547065,
+      "sample_sd": 0.01758781764277181
+    },
+    "gp_defect_trained": {
+      "mean": 0.42152616924667663,
+      "sample_sd": 0.02394233886700692
+    }
+  },
+  "batio3_interface_easy": {
+    "raster_heuristic": {
+      "mean": 0.05213081727036475,
+      "sample_sd": 0.0038892034406456623
+    },
+    "raster_trained": {
+      "mean": 0.366207672854925,
+      "sample_sd": 0.0023412526487745643
+    },
+    "random_trained": {
+      "mean": 0.314329385373048,
+      "sample_sd": 0.07650291641689226
+    },
+    "gp_intensity_trained": {
+      "mean": 0.35867561863979225,
+      "sample_sd": 0.05368020008034381
+    },
+    "gp_defect_trained": {
+      "mean": 0.3455343200320557,
+      "sample_sd": 0.08354337500445866
+    }
+  },
+  "sige_gradient_clustered_easy": {
+    "raster_heuristic": {
+      "mean": 0.002768936901550993,
+      "sample_sd": 0.00030904581115514976
+    },
+    "raster_trained": {
+      "mean": 0.07106390031699586,
+      "sample_sd": 0.0024942626622229016
+    },
+    "random_trained": {
+      "mean": 0.09635360026662312,
+      "sample_sd": 0.060570294264604946
+    },
+    "gp_intensity_trained": {
+      "mean": 0.10434105125731637,
+      "sample_sd": 0.06727100169424664
+    },
+    "gp_defect_trained": {
+      "mean": 0.093361384839363,
+      "sample_sd": 0.05762749807467661
+    }
+  },
+  "gan_easy": {
+    "raster_heuristic": {
+      "mean": 0.0120094518086246,
+      "sample_sd": 0.000675299456215151
+    },
+    "raster_trained": {
+      "mean": 0.09516953777006558,
+      "sample_sd": 0.0015886243699684422
+    },
+    "random_trained": {
+      "mean": 0.05415621426291388,
+      "sample_sd": 0.03208907305965453
+    },
+    "gp_intensity_trained": {
+      "mean": 0.08642579272591411,
+      "sample_sd": 0.053057061920538294
+    },
+    "gp_defect_trained": {
+      "mean": 0.06580912371805654,
+      "sample_sd": 0.032547061254591586
+    }
+  }
+}

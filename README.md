@@ -1,159 +1,105 @@
 # STEMGym
 
-A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Transmission Electron Microscopy.
+Source and reproducibility evidence for **STEMGym: Benchmarking Sequential Decision-Making under Dose Budgets in Autonomous Electron Microscopy**.
 
-Agents navigate a simulated specimen under a limited electron dose budget to characterize defects, phases, and atomic structure. Performance is measured via Dose-Efficiency Curves (DEC-AUC).
+The article and supplement are kept locally in ignored `development/final_manuscript_mlst/` and are excluded from this repository and its distributions. The original 220-episode study, release identities, audit records, and frozen source are retained in [`results/manuscript/`](results/manuscript/). New evaluations use the corrected synchronous implementation and have separate provenance.
 
-**Dataset & Checkpoints:** [https://huggingface.co/datasets/johnpolat/STEMGym](https://huggingface.co/datasets/johnpolat/STEMGym)
+## Installation with uv
 
-## Installation
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run from the repository root:
 
-```bash
-# Core package
-pip install -e .
-
-# With development tools (pytest)
-pip install -e ".[dev]"
-
-# With RL baselines (DQN, PPO, SAC via Stable-Baselines3)
-pip install -e ".[rl]"
-
-# With human baseline UI (Gradio)
-pip install -e ".[human]"
-
-# With abTEM simulation support (heavy, for world generation only)
-pip install -e ".[sim]"
+```sh
+uv sync --locked
+uv run --locked python reproducibility/prepare_test_data.py
+uv run --locked pytest -m "not slow and not training"
 ```
 
-Requires Python >= 3.10.
+`pyproject.toml` declares dependencies; `uv.lock` records their resolved versions. `.python-version` selects Python 3.14 for local development. Both CI jobs use Python 3.14, the newest version supported by the current dependency wheels. Package metadata permits Python 3.10 and later; older versions are not part of CI. On macOS with Python 3.10, SciPy 1.14.1 is pinned to avoid the [upstream wheel-loading issue](https://github.com/scipy/scipy/issues/25635); this combination passes the test suite. The environment is isolated and does not require an existing Conda installation. Do not copy an inherited system-site-packages environment into `.venv`.
 
-## Data Setup
+Simulation dependencies are optional:
 
-Download the simulated worlds and model checkpoints from [Hugging Face](https://huggingface.co/datasets/johnpolat/STEMGym):
-
-```bash
-python stem_gym/scripts/download_data.py              # everything (worlds + checkpoints + transfer)
-python stem_gym/scripts/download_data.py --worlds     # only HDF5 worlds (~7.1 GB)
-python stem_gym/scripts/download_data.py --checkpoints # main checkpoints + RL agents (~107 MB)
-python stem_gym/scripts/download_data.py --transfer   # transfer-learning checkpoints (~388 MB)
-python stem_gym/scripts/download_data.py --test-only  # only test_world.h5 (~10 MB, minimal)
+```sh
+uv sync --locked --extra sim
+uv run --locked --extra sim pytest -m slow
 ```
 
-Or generate the test world locally (no GPU needed):
+For CUDA simulation on Linux x86-64, add `--extra cuda` alongside `--extra sim`. CuPy is separate from the CPU simulation dependencies. CI runs one-epoch training smoke tests on eight tiles and at most 32 defect patches, checking finite losses, parameter updates, and checkpoint roundtrips. Run them with `uv run --locked pytest -m training_smoke`. Longer convergence tests remain available with `uv run --locked pytest -m "training and not training_smoke"`.
 
-```bash
-python stem_gym/scripts/generate_worlds/generate_test_world.py
+## Data and manuscript evidence
+
+Worlds and checkpoints are hosted on [Hugging Face](https://huggingface.co/datasets/kurbanintelligencelab/stemgym/tree/aa12b7380fed7a4362a18aa67df1ea135f7e15ff). Downloads are pinned to that revision and checked against SHA-256 hashes before publication to the local cache. Existing mismatched files cause an error and are not overwritten.
+
+```sh
+uv run --locked stemgym-download
+uv run --locked python reproducibility/validate_release.py
+uv run --locked python reproducibility/verify_reference.py
 ```
 
-## Quick Start
+The release contains 15 material worlds. The 13-world core contains 13,600 tiles and passes coordinate-bounds checks. Hard SrTiO3 and hard Pt/C remain additional records with inconsistent field bounds. Coordinate-bounds consistency does not establish physical calibration; the preserved image audit documents sampling and registration findings. Two separate test/replay fixtures are excluded from benchmark results.
 
-```bash
-# Run a quick smoke test
-stemgym run --config experiments/configs/quick_smoke.yaml
+`stemgym-download --worlds`, `--checkpoints`, and `--test-only` select subsets. HDF5 data and model weights remain ignored under `data/` and `checkpoints/`.
 
-# Run specific agents on a task
-stemgym run --agent raster stem_agent --task defect_census --world test_world --seeds 2
+## Evaluation and figures
 
-# List available agents, tasks, and worlds
-stemgym list agents
-stemgym list tasks
-stemgym list worlds
+The manuscript compares five configurations on four easy crystalline worlds over ten seeds, with 20 additional trained-raster episodes on medium/hard BaTiO3. Every reference episode acquires 50 distinct tiles, consumes 5,000 dose units, and scores after each five acquisitions.
 
-# Dry run (print plan without executing)
-stemgym run --config experiments/configs/main_defect_census.yaml --dry-run
+The original study is immutable evidence. The current evaluator fixes generic acquisition ordering, reset behavior, and coordinate handling; fresh results must be treated as a new implementation version. Recompute figures and tables from the preserved study without changing the manuscript:
+
+```sh
+uv run --locked python reproducibility/build_figures.py
+uv run --locked python reproducibility/verify_reference.py --artifacts-dir development/generated
 ```
 
-## Materials
+Run the current complete reference protocol into a new results file:
 
-| Material | Zone Axis | FOV | Defect Types | Primary Task |
-|----------|-----------|-----|-------------|-------------|
-| SrTiO3 | [001] | ~100 nm | O vacancies clustered along grain boundary | Defect Census |
-| BaTiO3 | [001] | ~100 nm | Cubic/tetragonal phase boundaries + O vacancies | Phase Mapping |
-| SiGe | [110] | ~50 nm | Ge substitutions concentrated in one quadrant | Targeted |
-| GaN | [11-20] | ~80 nm | InGaN quantum-well substitutions | Defect Census |
-| Pt nanoparticles | — | ~60 nm | Pt nanoparticles on amorphous carbon | Particle Census |
-
-Each material has 3 difficulty levels (easy, medium, hard) controlling defect density, phonon configurations, and dose budget. 15 worlds + test world + replay world = 17 total.
-
-## Agents
-
-| Agent | Type | Description |
-|-------|------|-------------|
-| `random` | Baseline | Random navigation |
-| `raster` | Baseline | Systematic grid traversal |
-| `gp_ucb` | Baseline | GP-UCB exploration |
-| `single_bo` | Baseline | Joint Bayesian optimization |
-| `stem_agent` | Multi-agent | Navigator (GP-UCB) + Analyst (neural ensemble) + Planner (FSM) |
-| `raster_equipped` | Equipped | Raster navigation + trained Analyst |
-| `gp_ucb_equipped` | Equipped | GP-UCB navigation + trained Analyst |
-| `random_equipped` | Equipped | Random navigation + trained Analyst |
-| `single_bo_equipped` | Equipped | Joint BO + trained Analyst |
-| `dqn` / `ppo` / `sac` | RL | Stable-Baselines3 RL navigation baselines |
-| `dqn_equipped` / `ppo_equipped` / `sac_equipped` | RL+Analyst | RL navigation + trained Analyst |
-| `raster_vlm_*` / `gp_ucb_vlm_*` | VLM | Vision-language model analysis (Claude, Gemini, GPT-5, Llama) |
-| `llm_planner` | LLM | LLM-based strategic planner via LangGraph |
-| `stem_agent_ei` / `stem_agent_ts` | Acquisition | Alternative acquisition functions (EI, Thompson sampling) |
-| `no_planner` / `no_uncertainty` / `rule_planner` | Ablation | Ablation variants of stem_agent |
-
-45 agents total. Run `stemgym list agents` for the full list.
-
-## Tasks
-
-| Task | Metric | Description |
-|------|--------|-------------|
-| `defect_census` | F1 | Detect and classify crystal defects |
-| `phase_mapping` | IoU | Identify material phases |
-| `targeted` | Spatial F1 | Locate specific target features |
-| `particle_census` | Detection + sizing | Nanoparticle detection, sizing, and morphology |
-| `composite` | Weighted | Multi-objective: defect census + phase mapping |
-
-## Training
-
-```bash
-# Train the analyst ensemble (AtomFinder + DefectClassifier + PhaseIdentifier)
-python stem_gym/scripts/train_analyst.py --world data/simulated/test_world.h5 --output checkpoints/
-
-# Train RL agents (DQN, PPO, SAC)
-python stem_gym/scripts/train_rl.py --algo dqn --steps 50000
-python stem_gym/scripts/train_rl.py --algo ppo --steps 50000
-python stem_gym/scripts/train_rl.py --algo sac --steps 50000 --device cuda
-
-# Human baseline UI
-python stem_gym/scripts/human_baseline.py --world data/simulated/test_world.h5
+```sh
+uv run --locked python reproducibility/evaluate_reference.py --output development/runs/reference.json
+uv run --locked python reproducibility/build_figures.py --results development/runs/reference.json --output-dir development/generated-current
+uv run --locked python reproducibility/verify_reference.py --results development/runs/reference.json --artifacts-dir development/generated-current
 ```
 
-## Project Structure
+The evaluator resumes one JSON file per run. It refuses to resume when its source, imported implementation, lockfile, or seed count changes. Default outputs are under ignored `development/`; output guards protect the canonical manuscript and original evidence. Use `CUDA_VISIBLE_DEVICES=""` for CPU-only GP fitting. Analyst inference uses CPU.
 
+## Implementation
+
+| Location | Responsibility |
+|---|---|
+| `stem_gym/envs/` | World access, observations, validated actions and dose accounting |
+| `stem_gym/geometry.py` | Shared tile/position conversion |
+| `stem_gym/agents/` | Trained and heuristic image analysis, public findings |
+| `stem_gym/baselines/` | Seeded action selection and acquisition feedback |
+| `stem_gym/runner.py` | Shared acquire → observe/analyze → score loop |
+| `stem_gym/evaluation.py` | Reference configuration and policy/analyst composition |
+| `stem_gym/scoring.py`, `tasks/`, `metrics.py` | Ground-truth selection and scoring |
+| `stem_gym/data.py`, `scripts/` | Verified downloads, training and generation |
+| `reproducibility/` | Verification, figure generation, auditing and source packaging |
+| `results/manuscript/` | Tracked historical manuscript evidence |
+| `development/` | Ignored exploratory code, old manuscripts, fresh runs and build outputs |
+
+Agents implement `reset(obs, info, seed=...)`, `act(obs, info)`, `observe(obs, info)` and `get_findings()`. When driving an agent manually, call `observe` immediately after every environment step, including the terminating acquisition. `run_episode` handles this automatically. Successful acquisitions and unique visited tiles have separate counters. Analyst reset restores the initially loaded heads and clears episode-specific fallback state.
+
+## Verification and packaging
+
+```sh
+uv lock --check
+uv pip check
+uv run --locked ruff check stem_gym tests reproducibility
+uv run --locked pytest -m "not slow"
+uv run --locked python reproducibility/audit_calibration.py
+uv run --locked python reproducibility/package_source.py
+uv build --out-dir development/dist
 ```
-stem_gym/              Core package
-  envs/                Gymnasium environment + HDF5 world
-  agents/              Multi-agent system (Navigator, Analyst, Planner)
-  baselines/           Baseline agents (Random, Raster, GP-UCB, SingleBO, RL, VLM)
-  tasks/               Task definitions and scoring
-  scripts/             Data download, model training, human baseline UI
-    generate_worlds/   World-generation scripts (abTEM simulation)
-  metrics.py           DEC curve computation
-  runner.py            Episode and benchmark execution
-experiments/           Configs and CLI runner
-data/                  Simulated worlds (HDF5)
-checkpoints/           Trained neural model weights + RL agents
-tests/                 Test suite
+
+The review archive is `development/releases/stemgym_mlst_source.zip`; every included file is rechecked against its embedded hash manifest. The wheel is the runtime library and download CLI, with the pinned dataset manifest included. The source distribution and review archive additionally include reproduction scripts, tests, lockfile and reference evidence. Development files, data caches, credentials and trained weights are excluded.
+
+Compile the multi-file journal project with TeX Live and `latexmk`, retaining the supplied IOP class. Generate build products outside the canonical manuscript directory:
+
+```sh
+mkdir -p development/latex
+latexmk -pdf -interaction=nonstopmode -halt-on-error -cd -outdir=../latex development/final_manuscript_mlst/main.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error -cd -outdir=../latex development/final_manuscript_mlst/supplement.tex
 ```
 
 ## License
 
-Code: MIT. Data: CC-BY-4.0.
-
-## Authors
-
-ANON
-
-## Citation
-
-```bibtex
-@inproceedings{2026stemgym,
-  title={STEMGym: A Gymnasium Environment for Benchmarking Dose-Efficient Autonomous Scanning Transmission Electron Microscopy},
-  author={anon},
-  year={2026}
-}
-```
+Code: MIT. Data: CC-BY-4.0. Scientific authorship is recorded in the manuscript.

@@ -31,8 +31,10 @@ class RasterAgent(Agent):
         self._navigate_phase = True
         self._current_target: tuple[float, float] = (0.0, 0.0)
 
-    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any], *, seed: int | None = None) -> None:
         self.analyst.reset()
+        self._observed_acquisitions = 0
+        self._geometry = info.get("geometry")
         self._grid_shape = obs["visited_mask"].shape
         self._fov_nm = info.get("fov_nm", (100.0, 100.0))
         self._navigate_phase = True
@@ -43,6 +45,8 @@ class RasterAgent(Agent):
 
     def _tile_to_nm(self, row: int, col: int) -> tuple[float, float]:
         """Convert tile grid position to nm coordinates."""
+        if self._geometry is not None:
+            return self._geometry.tile_to_nm(row, col)
         rows, cols = self._grid_shape
         fov_h, fov_w = self._fov_nm
         # Map grid position to FOV center of each tile
@@ -74,11 +78,6 @@ class RasterAgent(Agent):
             # Acquire at current position
             self._tile_queue.pop(0)
             self._navigate_phase = True
-
-            # Analyze the tile from observation
-            tile = obs.get("tile")
-            if tile is not None and tile.max() > 0:
-                self.analyst.analyze_tile(tile)
 
             return {
                 "action_type": ActionType.ACQUIRE,

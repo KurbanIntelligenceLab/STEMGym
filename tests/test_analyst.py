@@ -155,6 +155,7 @@ class TestAnalyst:
 
 # ---- Training and evaluation tests ----
 
+@pytest.mark.training
 class TestTraining:
     """Test that training pipeline works and produces reasonable models.
 
@@ -164,7 +165,8 @@ class TestTraining:
     """
 
     @pytest.fixture(scope="class")
-    def trained_models(self):
+    @classmethod
+    def trained_models(cls):
         """Train all models on the fake test world (shared across class)."""
         if not TEST_WORLD.exists():
             pytest.skip("Test world not generated")

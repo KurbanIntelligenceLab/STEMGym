@@ -13,6 +13,7 @@ build/
 .venv/
 venv/
 env/
+building_utils/
 
 # Testing
 .pytest_cache/
@@ -36,15 +37,41 @@ checkpoints/
 building_utils/
 
 # Results (generated, not tracked)
-results/
+/results/*
+!/results/manuscript/
+results_old/
 
+# Backup directories
+checkpoints_old/
 
+# Notebooks (local analysis, not tracked)
+notebooks/
 
+# Figures (generated)
+figures/
 
+# Dataverse staging (temporary download/upload)
+.dataverse_staging/
 
-
+# SSH deploy keys
+scripts/vastai_deploy_key
+scripts/vastai_deploy_key.pub
 
 # Local-only files
+CLAUDE.md
+hf_dataset_card.md
+IMPLEMENTATION_PLAN.MD
+STRATEGY_TO_NEURIPS_AND_BEYOND.MD
 docs/
 paper
 .claude
+/development/
+# TeX build products
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz

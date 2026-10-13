@@ -29,6 +29,10 @@ import logging
 import time
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from stem_gym.agents.models import AtomFinderEnsemble, DefectClassifierCNN, PhaseIdentifierResNet
 
 import h5py
 import numpy as np

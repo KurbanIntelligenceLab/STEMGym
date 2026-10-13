@@ -1,0 +1,16 @@
+[
+  {
+    "world": "srtio3_clustered_easy",
+    "policy": "raster_trained",
+    "seed": 0,
+    "exactly_reproduced": true,
+    "mismatched_fields": []
+  },
+  {
+    "world": "srtio3_clustered_easy",
+    "policy": "gp_defect_trained",
+    "seed": 0,
+    "exactly_reproduced": true,
+    "mismatched_fields": []
+  }
+]

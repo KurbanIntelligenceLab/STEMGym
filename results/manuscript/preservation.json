@@ -1,0 +1,16 @@
+{
+  "files": {
+    "reference_summary.json": "fd3d402a6331b90c28514da1bdc079badb308f6133843ca3e2fa2f7384bdf795",
+    "original_evaluate_reference.py": "1a4f76792a43353e99df2bef5ecebc84451d151bcd575c039095f25566b1a55c",
+    "reference_results.json": "39fd45bb16c22f8c5f9bc5e6add68cb5ef67d0cd000a43c9bb77e6e62d7c5258",
+    "repeatability_checks.json": "335200948ee65aa86a8761c31d3b64850e6842759127ed7b20a278132def0516",
+    "release_manifest.json": "45bcdd6d3a950f19407c0c222a7de12f16422b7783df8bcac06a31335f74cbb7",
+    "release_validation.json": "03aaa2574ac8ace4117c331fa04085b46063af70647b4ddc23c00b3bfd3b34dd",
+    "verification.json": "d5c01dd2b638c3f4af45eecc5333f191aaf4f70f058a86c87cca3e550c7dfff1",
+    "figure_sources.json": "2581b4e60e9684b18db20bc40f97dbcc7a60eaa6445893e24cf7161cfc23136d",
+    "original_source.zip": "53f6f7661e7eaaa111f5a105b9790cb6e0dc928895c1435a56d0e5a1b4d661ca",
+    "calibration_audit.json": "14bb483d805fad586fc6da2aeb0b0abcf8dd9fbcf656482d347f101249ff5e9b"
+  },
+  "source_commit": "db94d9ab6e764392a518c6d42b4ccccac9570ec8",
+  "source_state": "Uncommitted working tree preserved before refactoring; original_source.zip is authoritative."
+}
