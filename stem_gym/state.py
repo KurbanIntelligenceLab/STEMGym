@@ -1,21 +1,11 @@
-"""ExperimentState: blackboard shared by all agents."""
+"""State and declared findings for a STEMGym episode."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import Any
 
 import numpy as np
-
-
-class PlannerMode(Enum):
-    """FSM planner states."""
-    SURVEY = auto()
-    INVESTIGATE = auto()
-    CHARACTERIZE = auto()
-    CENSUS = auto()
-    TERMINATE = auto()
 
 
 @dataclass
@@ -28,18 +18,8 @@ class Finding:
 
 
 @dataclass
-class TransitionLog:
-    """Record of a planner FSM transition."""
-    step: int
-    from_mode: PlannerMode
-    to_mode: PlannerMode
-    reason: str
-    budget_remaining: float
-
-
-@dataclass
 class ExperimentState:
-    """Blackboard dataclass shared by Navigator, Analyst, and Planner.
+    """Environment state and accumulated analysis outputs.
 
     This is the central state object that all agents read from and write to.
     It is NOT the Gymnasium observation — the env constructs obs from this +
@@ -68,6 +48,7 @@ class ExperimentState:
     dose_map: np.ndarray | None = None
     # Number of unique tiles acquired
     tiles_acquired: int = 0
+    acquisitions: int = 0  # All successful acquisitions, including revisits
 
     # --- Analyst outputs ---
     atom_positions: np.ndarray | None = None    # (N, 2) detected atom positions
@@ -76,12 +57,6 @@ class ExperimentState:
     defect_positions: list[Finding] = field(default_factory=list)
     phase_map: np.ndarray | None = None         # (H, W) phase labels
     confidence_map: np.ndarray | None = None    # (H, W) analyst confidence
-
-    # --- Planner state ---
-    mode: PlannerMode = PlannerMode.SURVEY
-    planner_beta: float = 2.0               # GP-UCB exploration parameter
-    transition_log: list[TransitionLog] = field(default_factory=list)
-    hypotheses: list[dict[str, Any]] = field(default_factory=list)
 
     # --- Agent findings (for task scoring) ---
     findings: list[Finding] = field(default_factory=list)

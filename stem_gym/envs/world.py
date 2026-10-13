@@ -36,6 +36,7 @@ class World:
 
     def __init__(self, path: str | Path):
         self.path = Path(path)
+        self.rng = np.random.default_rng()
         self._file: h5py.File | None = None
         self._metadata: dict[str, Any] = {}
         self._ground_truth_cache: dict[str, Any] | None = None
@@ -105,19 +106,16 @@ class World:
         """Tile step size = tile_size - overlap."""
         return self.tile_size_px - self.overlap_px
 
+    @property
+    def geometry(self):
+        from stem_gym.geometry import WorldGeometry
+        return WorldGeometry(self.grid_shape, self.pixel_size_nm, self.tile_size_px, self.stride_px)
+
     def nm_to_tile(self, x_nm: float, y_nm: float) -> tuple[int, int]:
-        """Convert world nm coordinates to tile grid indices (row, col)."""
-        px_x = x_nm / self.pixel_size_nm
-        px_y = y_nm / self.pixel_size_nm
-        row = int(np.clip(px_y / self.stride_px, 0, self.grid_shape[0] - 1))
-        col = int(np.clip(px_x / self.stride_px, 0, self.grid_shape[1] - 1))
-        return row, col
+        return self.geometry.nm_to_tile(x_nm, y_nm)
 
     def tile_to_nm(self, row: int, col: int) -> tuple[float, float]:
-        """Convert tile grid indices to world nm coordinates (center of tile)."""
-        px_y = row * self.stride_px + self.tile_size_px / 2
-        px_x = col * self.stride_px + self.tile_size_px / 2
-        return px_x * self.pixel_size_nm, px_y * self.pixel_size_nm
+        return self.geometry.tile_to_nm(row, col)
 
     def get_tile(self, row: int, col: int) -> np.ndarray:
         """Load a single tile from HDF5. Returns (tile_size, tile_size) float32."""
@@ -246,9 +244,11 @@ class World:
         Returns:
             Noisy tile (float32).
         """
+        if not np.isfinite(dose) or dose <= 0:
+            raise ValueError("Dose must be finite and positive")
         # Scale intensity by dose to get expected counts
         expected = np.clip(tile * dose, 0, None)
-        noisy = np.random.poisson(expected).astype(np.float32)
+        noisy = self.rng.poisson(expected).astype(np.float32)
         # Normalize back
         if dose > 0:
             noisy /= dose

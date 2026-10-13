@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -20,50 +19,7 @@ from stem_gym.envs.world import World
 from stem_gym.metrics import DECResult, compute_dec
 
 
-def filter_gt_to_explored(
-    gt: dict[str, Any],
-    visited_mask: np.ndarray,
-    world: World,
-) -> dict[str, Any]:
-    """Filter ground truth to only atoms within explored (visited) tiles.
-
-    Converts atom positions (nm) to tile grid coordinates and keeps only
-    atoms whose tile has been visited by the agent. This prevents penalizing
-    agents for not detecting defects in regions they haven't explored.
-
-    Args:
-        gt: Full ground truth dict from world.get_ground_truth().
-        visited_mask: Boolean array (grid_h, grid_w) of visited tiles.
-        world: World object for coordinate conversion.
-
-    Returns:
-        Filtered ground truth dict (shallow copy with filtered arrays).
-    """
-    atom_positions = gt.get("atom_positions")
-    if atom_positions is None or len(atom_positions) == 0:
-        return gt
-
-    # Convert atom positions (nm) to tile grid indices
-    # atom_positions is (N, 2) with columns [x_nm, y_nm]
-    px_x = atom_positions[:, 0] / world.pixel_size_nm
-    px_y = atom_positions[:, 1] / world.pixel_size_nm
-
-    rows = np.clip((px_y / world.stride_px).astype(int), 0, world.grid_shape[0] - 1)
-    cols = np.clip((px_x / world.stride_px).astype(int), 0, world.grid_shape[1] - 1)
-
-    # Boolean mask: True if atom's tile has been visited
-    mask = visited_mask[rows, cols]
-
-    # Filter all atom-level arrays
-    filtered = dict(gt)
-    filtered["atom_positions"] = atom_positions[mask]
-
-    for key in ("atom_types", "defect_mask", "defect_types",
-                "particle_diameters_nm", "particle_morphology_labels"):
-        if key in gt and gt[key] is not None and len(gt[key]) == len(atom_positions):
-            filtered[key] = gt[key][mask]
-
-    return filtered
+from stem_gym.scoring import filter_gt_to_explored
 
 
 @dataclass
@@ -100,8 +56,10 @@ def run_episode(
     Returns:
         EpisodeResult with episode log, DEC curve, etc.
     """
+    if score_every_n_acquires < 1:
+        raise ValueError("Scoring interval must be positive")
     obs, info = env.reset(seed=seed)
-    agent.reset(obs, info)
+    agent.reset(obs, info, seed=seed)
 
     episode_log: list[dict[str, Any]] = []
     acquires_since_score = 0
@@ -109,12 +67,14 @@ def run_episode(
 
     # +10 buffer: DECLARE annotation actions don't consume dose or count
     # toward max_steps, so the loop may need extra iterations to converge
-    for step in range(env._init_max_steps + 10):
+    for step in range(env.max_steps + 10):
         action = agent.act(obs, info)
         obs, reward, terminated, truncated, info = env.step(action)
 
+        agent.observe(obs, info)
+
         # Track acquisitions
-        current_tiles = env.state.tiles_acquired
+        current_tiles = env.state.acquisitions
         if current_tiles > last_tiles_acquired:
             acquires_since_score += (current_tiles - last_tiles_acquired)
             last_tiles_acquired = current_tiles
@@ -124,7 +84,8 @@ def run_episode(
             "step": step,
             "action_type": int(action.get("action_type", -1)),
             "dose_used": env.state.dose_used,
-            "tiles_acquired": current_tiles,
+            "tiles_acquired": env.state.tiles_acquired,
+            "acquisitions": current_tiles,
             "position": env.state.position,
             "n_declarations": len(env.state.findings),
             "task_score": None,
@@ -142,10 +103,6 @@ def run_episode(
                 gt = filter_gt_to_explored(gt, env.state.visited_mask, env.world)
             score = env.task.score(findings, gt)
             log_entry["task_score"] = score
-            # Log composite sub-scores if available
-            if hasattr(env.task, "_last_scores"):
-                log_entry["task_score_a"] = env.task._last_scores[0]
-                log_entry["task_score_b"] = env.task._last_scores[1]
             acquires_since_score = 0
 
         # Final scoring at episode end
@@ -157,17 +114,15 @@ def run_episode(
                 gt = filter_gt_to_explored(gt, env.state.visited_mask, env.world)
             score = env.task.score(findings, gt)
             log_entry["task_score"] = score
-            # Log composite sub-scores if available
-            if hasattr(env.task, "_last_scores"):
-                log_entry["task_score_a"] = env.task._last_scores[0]
-                log_entry["task_score_b"] = env.task._last_scores[1]
             episode_log.append(log_entry)
             break
 
         episode_log.append(log_entry)
+    else:
+        raise RuntimeError("Agent exceeded the interaction limit without terminating")
 
     # Compute DEC
-    dec = compute_dec(episode_log, env._init_budget)
+    dec = compute_dec(episode_log, env.total_budget)
 
     return EpisodeResult(
         episode_log=episode_log,
@@ -177,6 +132,7 @@ def run_episode(
         final_score=dec.scores[-1] if len(dec.scores) > 0 else 0.0,
         dec=dec,
         agent_findings=agent.get_findings(),
+        seed=seed,
     )
 
 
@@ -218,6 +174,8 @@ def run_benchmark(
     if seeds is None:
         seeds = list(range(n_seeds))
 
+    if not seeds:
+        raise ValueError("At least one seed is required")
     results = []
     for seed in seeds:
         t0 = time.perf_counter()
@@ -245,64 +203,3 @@ def run_benchmark(
         mean_dose_used=float(np.mean([r.total_dose_used for r in results])),
         mean_tiles=float(np.mean([r.tiles_acquired for r in results])),
     )
-
-
-def _run_episode_isolated(job: dict[str, Any]) -> dict[str, Any]:
-    """Run a single episode in an isolated process.
-
-    Accepts a plain dict (picklable) and returns a plain dict.
-    Designed for use with ProcessPoolExecutor.
-
-    Args:
-        job: dict with keys: agent_name, task_name, world_path, seed,
-             budget, max_steps, score_every_n_acquires.
-
-    Returns:
-        dict with episode result data (JSON-serializable).
-    """
-    # Late imports so each worker process initializes independently
-    from stem_gym.envs.stem_env import STEMEnv  # noqa: F811
-
-    # Import make_agent/make_task from experiments module
-    import importlib
-    run_bench = importlib.import_module("experiments.run_benchmark")
-
-    agent_name = job["agent_name"]
-    task_name = job["task_name"]
-    world_path = job["world_path"]
-    seed = job["seed"]
-    budget = job["budget"]
-    max_steps = job["max_steps"]
-    score_every = job["score_every_n_acquires"]
-
-    task = run_bench.make_task(task_name)
-    env = STEMEnv(world_path, task=task, total_budget=budget, max_steps=max_steps)
-    agent = run_bench.make_agent(agent_name, seed=seed)
-
-    result = run_episode(env, agent, seed=seed, score_every_n_acquires=score_every)
-    env.close()
-
-    episode_data = {
-        "seed": seed,
-        "dec_auc": result.dec.auc,
-        "final_score": result.final_score,
-        "tiles_acquired": result.tiles_acquired,
-        "total_dose_used": result.total_dose_used,
-        "total_steps": result.total_steps,
-        "dec_dose_fractions": result.dec.dose_fractions.tolist(),
-        "dec_scores": result.dec.scores.tolist(),
-    }
-
-    if job.get("save_trajectories"):
-        episode_data["trajectory"] = [
-            {
-                "step": e["step"],
-                "action_type": e.get("action_type", -1),
-                "dose_used": e["dose_used"],
-                "tiles_acquired": e["tiles_acquired"],
-                "position": list(e["position"]) if e.get("position") else None,
-            }
-            for e in result.episode_log
-        ]
-
-    return episode_data

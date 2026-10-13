@@ -60,13 +60,20 @@ class STEMEnv(gym.Env):
         render_mode: str | None = None,
     ):
         super().__init__()
-        # Auto-detect replay worlds by metadata so real-data acquisitions don't
-        # have Poisson noise re-applied on top of native experimental noise.
+        for name, value in {"total_budget": total_budget, "dose_per_acquire": dose_per_acquire}.items():
+            if not np.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        if isinstance(max_steps, bool) or not isinstance(max_steps, (int, np.integer)) or max_steps <= 0:
+            raise ValueError("max_steps must be a positive integer")
+        if isinstance(overview_size, bool) or not isinstance(overview_size, (int, np.integer)) or overview_size <= 0:
+            raise ValueError("overview_size must be a positive integer")
         import h5py
-        with h5py.File(world_path, "r") as _probe:
-            _difficulty = str(_probe["metadata"].attrs.get("difficulty", ""))
-        if _difficulty == "real":
+
+        with h5py.File(world_path, "r") as probe:
+            difficulty = str(probe["metadata"].attrs.get("difficulty", ""))
+        if difficulty == "real":
             from stem_gym.envs.replay_world import ReplayWorld
+
             self.world = ReplayWorld(world_path)
         else:
             self.world = World(world_path)
@@ -126,6 +133,14 @@ class STEMEnv(gym.Env):
         self._terminated = False
         self._truncated = False
 
+    @property
+    def total_budget(self) -> float:
+        return self._init_budget
+
+    @property
+    def max_steps(self) -> int:
+        return self._init_max_steps
+
     def _build_state(self) -> ExperimentState:
         grid_h, grid_w = self.world.grid_shape
         return ExperimentState(
@@ -163,6 +178,9 @@ class STEMEnv(gym.Env):
     def _get_info(self) -> dict[str, Any]:
         s = self.state
         return {
+            "acquisitions": s.acquisitions,
+            "tile_position": self.world.nm_to_tile(*s.position),
+            "geometry": self.world.geometry,
             "dose_used": s.dose_used,
             "budget_remaining": s.budget_remaining,
             "tiles_acquired": s.tiles_acquired,
@@ -178,6 +196,7 @@ class STEMEnv(gym.Env):
         self, *, seed: int | None = None, options: dict | None = None
     ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
         super().reset(seed=seed)
+        self.world.rng = self.np_random
         self.state = self._build_state()
         tile_size = self.world.tile_size_px
         self._last_tile = np.zeros((tile_size, tile_size), dtype=np.float32)
@@ -191,9 +210,26 @@ class STEMEnv(gym.Env):
         if self.state is None:
             raise RuntimeError("Must call reset() before step()")
 
+        if self._terminated or self._truncated:
+            raise RuntimeError("Episode has ended; call reset() before step()")
+        raw_type = action.get("action_type")
+        if isinstance(raw_type, (bool, np.bool_)) or not isinstance(raw_type, (int, np.integer)) or raw_type not in range(4):
+            raise ValueError("action_type must be an integer from 0 to 3")
+        action_type = int(raw_type)
+        if action_type == ActionType.NAVIGATE:
+            position = np.asarray(action.get("position"), dtype=float)
+            if position.shape != (2,) or not np.isfinite(position).all():
+                raise ValueError("position must contain two finite coordinates")
+        for name, lower, upper in [("zoom", 1.0, 4.0), ("dwell", 0.1, 10.0)]:
+            if name in action:
+                value = np.asarray(action[name], dtype=float)
+                if value.shape != (1,) or not np.isfinite(value).all() or not lower <= value[0] <= upper:
+                    raise ValueError(f"{name} must have shape (1,) and be in [{lower}, {upper}]")
+        finding_type = action.get("finding_type", 0)
+        if isinstance(finding_type, (bool, np.bool_)) or not isinstance(finding_type, (int, np.integer)) or finding_type not in range(8):
+            raise ValueError("finding_type must be an integer from 0 to 7")
         s = self.state
         reward = 0.0
-        action_type = int(action["action_type"])
 
         # DECLARE is zero-cost: no step count, no dose, just an annotation
         if action_type == ActionType.DECLARE:
@@ -236,6 +272,7 @@ class STEMEnv(gym.Env):
                 self._last_tile = noisy_tile
 
                 # Update bookkeeping
+                s.acquisitions += 1
                 s.dose_used += dose_cost
                 s.dose_map[row, col] += dose_cost
                 if not s.visited_mask[row, col]:
@@ -261,7 +298,7 @@ class STEMEnv(gym.Env):
             gt = self.world.get_ground_truth()
             # Filter GT to explored region for atom-level tasks
             if self.task.name != "phase_mapping":
-                from stem_gym.runner import filter_gt_to_explored
+                from stem_gym.scoring import filter_gt_to_explored
                 gt = filter_gt_to_explored(gt, s.visited_mask, self.world)
             info["task_score"] = self.task.score(s.to_findings_dict(), gt)
             reward = info["task_score"]

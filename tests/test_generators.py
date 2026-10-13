@@ -15,6 +15,8 @@ import pytest
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent / "stem_gym" / "scripts" / "generate_worlds"))
 
+pytest.importorskip("ase")
+
 from sim_utils import (
     SimConfig,
     GroundTruth,
@@ -680,12 +682,27 @@ class TestPtNanoparticlesGenerator:
 class TestEnvIntegration:
     """Test that generated worlds work with STEMEnv."""
 
-    @pytest.fixture(params=["srtio3_test_mini", "batio3_test_mini", "sige_test_mini"])
-    def world_path(self, request):
-        p = Path("data/simulated") / f"{request.param}.h5"
-        if not p.exists():
-            pytest.skip(f"{p} not generated")
-        return p
+    @pytest.fixture(params=["srtio3", "batio3", "sige"])
+    def world_path(self, request, tmp_path):
+        # Generate independent fixtures instead of depending on files left by other tests.
+        material = request.param
+        if material == "srtio3":
+            from generate_srtio3_clustered import build_srtio3_unit_cell
+            atoms = build_supercell(build_srtio3_unit_cell(), (12.0, 12.0, 12.0))
+            sigmas = {"Sr": 0.084, "Ti": 0.060, "O": 0.085}
+        elif material == "batio3":
+            from generate_batio3_interface import build_batio3_cell
+            atoms = build_supercell(build_batio3_cell("cubic"), (12.0, 12.0, 12.0))
+            sigmas = {"Ba": 0.080, "Ti": 0.080, "O": 0.090}
+        else:
+            from generate_sige_gradient_clustered import build_si_supercell_110
+            atoms = build_si_supercell_110(12.0, 12.0)
+            sigmas = {"Si": 0.078}
+        config = _mini_sim_config(scenario=material, phonon_sigmas=sigmas)
+        image = run_stem_simulation(atoms, config)
+        path = tmp_path / (material + ".h5")
+        write_world_hdf5(path, image, record_ground_truth(atoms), config)
+        return path
 
     def test_env_runs(self, world_path):
         env = STEMEnv(world_path, total_budget=1e4, max_steps=10)

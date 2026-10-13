@@ -11,9 +11,6 @@ from stem_gym.baselines import Agent
 from stem_gym.baselines.random_agent import RandomAgent
 from stem_gym.baselines.raster_scan import RasterAgent
 from stem_gym.baselines.gp_ucb import GPUCBAgent
-from stem_gym.baselines.single_bo import SingleBOAgent
-from stem_gym.baselines.kalinin_gp_bo import KalininGPBOAgent
-from stem_gym.baselines.compressed_sensing import CompressedSensingAgent
 from stem_gym.agents.simple_analyst import SimpleAnalyst
 from stem_gym.envs.stem_env import STEMEnv, ActionType
 from stem_gym.tasks import DummyTask
@@ -82,9 +79,6 @@ class TestAgentProtocol:
         ("random", RandomAgent),
         ("raster", RasterAgent),
         ("gp_ucb", GPUCBAgent),
-        ("single_bo", SingleBOAgent),
-        ("kalinin_gp_bo", KalininGPBOAgent),
-        ("compressed_sensing", CompressedSensingAgent),
     ])
     def agent_cls(self, request):
         return request.param
@@ -94,10 +88,8 @@ class TestAgentProtocol:
         name, cls = agent_cls
         env = STEMEnv(world_path, total_budget=5000.0, max_steps=100)
 
-        if name in ("gp_ucb", "single_bo", "kalinin_gp_bo"):
+        if name == "gp_ucb":
             agent = cls(seed=42, initial_random=3)
-        elif name == "compressed_sensing":
-            agent = cls(seed=42, coverage_frac=0.2)
         else:
             agent = cls(seed=42)
 
@@ -123,7 +115,7 @@ class TestAgentProtocol:
     def test_agent_has_get_findings(self, world_path, agent_cls):
         """Each agent should provide get_findings()."""
         name, cls = agent_cls
-        agent = cls(seed=42) if name not in ("gp_ucb", "single_bo") else cls(seed=42, initial_random=2)
+        agent = cls(seed=42) if name != "gp_ucb" else cls(seed=42, initial_random=2)
 
         env = STEMEnv(world_path, total_budget=2000.0, max_steps=30)
         obs, info = env.reset(seed=42)
@@ -215,7 +207,6 @@ class TestBaselineOrdering:
             ("random", RandomAgent, {}),
             ("raster", RasterAgent, {}),
             ("gp_ucb", GPUCBAgent, {"initial_random": 3}),
-            ("single_bo", SingleBOAgent, {"initial_random": 3}),
         ]:
             env = STEMEnv(world_path, task=DefectCensusTask(),
                           total_budget=budget, max_steps=max_steps)

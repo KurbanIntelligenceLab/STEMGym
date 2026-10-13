@@ -23,14 +23,18 @@ class RandomAgent(Agent):
     """
 
     def __init__(self, seed: int = 42):
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.analyst = SimpleAnalyst()
         self._fov: tuple[float, float] = (1.0, 1.0)
         self._step = 0
         self._navigate_phase = True  # alternate navigate → acquire
 
-    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any]) -> None:
+    def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any], *, seed: int | None = None) -> None:
+        self.rng = np.random.default_rng(self.seed if seed is None else seed)
         self.analyst.reset()
+        self._observed_acquisitions = 0
+        self._geometry = info.get("geometry")
         self._step = 0
         self._navigate_phase = True
         self._grid_shape = obs["visited_mask"].shape
@@ -61,10 +65,6 @@ class RandomAgent(Agent):
         else:
             # Acquire at current position
             self._navigate_phase = True
-            # Analyze the previous tile if we have one
-            tile = obs.get("tile")
-            if tile is not None and tile.max() > 0:
-                self.analyst.analyze_tile(tile)
             return {
                 "action_type": ActionType.ACQUIRE,
                 "position": obs["position"].copy(),

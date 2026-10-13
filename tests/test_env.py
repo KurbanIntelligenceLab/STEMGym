@@ -123,6 +123,31 @@ class TestNavigate:
 
 
 class TestAcquire:
+    def test_detector_noise_repeats_with_episode_seed(self, env):
+        action = {"action_type": ActionType.ACQUIRE}
+        env.reset(seed=17)
+        first = env.step(action)[0]["tile"].copy()
+        env.reset(seed=17)
+        repeated = env.step(action)[0]["tile"].copy()
+        np.testing.assert_array_equal(first, repeated)
+        env.reset(seed=18)
+        different = env.step(action)[0]["tile"]
+        assert not np.array_equal(first, different)
+
+    def test_detector_noise_is_independent_of_global_random_state(self, env):
+        action = {"action_type": ActionType.ACQUIRE}
+        env.reset(seed=17)
+        expected = env.step(action)[0]["tile"].copy()
+        env.reset(seed=17)
+        state = np.random.get_state()
+        try:
+            np.random.seed(999)
+            np.random.poisson(50, size=1000)
+            observed = env.step(action)[0]["tile"]
+        finally:
+            np.random.set_state(state)
+        np.testing.assert_array_equal(expected, observed)
+
     def test_acquire_costs_dose(self, env):
         env.reset(seed=42)
         initial_dose = env.state.dose_used

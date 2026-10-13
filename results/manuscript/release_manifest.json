@@ -1,0 +1,391 @@
+{
+  "id": "kurbanintelligencelab/stemgym",
+  "sha": "aa12b7380fed7a4362a18aa67df1ea135f7e15ff",
+  "siblings": [
+    {
+      "rfilename": ".gitattributes",
+      "blobId": "bed0738c7eeb449bca98b5d2f33c89a1ee56349a",
+      "size": 2504
+    },
+    {
+      "rfilename": "README.md",
+      "blobId": "4d5b954240a4f1dc018513968fda7a229f6ef685",
+      "size": 5540
+    },
+    {
+      "rfilename": "checkpoints/atom_finder.pt",
+      "blobId": "2ac3114234e53880783b5e771413e4e109a21f33",
+      "size": 92556970,
+      "lfs": {
+        "sha256": "a98f9f60584bd4c0a18828f4c8dc3254bfbf5bf624ea2a2392b8ce307de6cad9",
+        "size": 92556970,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "checkpoints/defect_classifier.pt",
+      "blobId": "8ed20fd76aca2d8b6806ab303aa0b0236e19b3c2",
+      "size": 1426180,
+      "lfs": {
+        "sha256": "4491ff97578645daa4f0586d4b16f7f8cec63e881e4c6ec0bb61001eea4a8264",
+        "size": 1426180,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/dqn_agent.zip",
+      "blobId": "ad8a2533c609aef21f3031bf7678769577701a5a",
+      "size": 843980,
+      "lfs": {
+        "sha256": "ea63d8011b914883e4c2f680c4365abc1976af7428e157dd1f202dc8a7ec347d",
+        "size": 843980,
+        "pointerSize": 131
+      }
+    },
+    {
+      "rfilename": "checkpoints/phase_identifier.pt",
+      "blobId": "f60fdf5597ad8ed9f82a4e5d27bccda3f9b47690",
+      "size": 7724106,
+      "lfs": {
+        "sha256": "b2d26ba3307827eea0e7b2ae3671edd0832aa8ea1a0ddf0a4d4e207a29ae2bb0",
+        "size": 7724106,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/ppo_agent.zip",
+      "blobId": "c3e19646ef7b7aa112c85fbbe871ce549d253ccf",
+      "size": 1095034,
+      "lfs": {
+        "sha256": "9a1c4e121ad4be16d34db1c36508847b0320015d3880b10aae7b1ca839c1f74e",
+        "size": 1095034,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/sac_agent.zip",
+      "blobId": "c22695e25e7ba6de6bc9348be0a570154779558c",
+      "size": 8825602,
+      "lfs": {
+        "sha256": "5c4a24eb61181d99bec8e411eab8bb00879bb7987fb7e68479b005b34c1aad37",
+        "size": 8825602,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/batio3/atom_finder.pt",
+      "blobId": "b90a9d273825cd9dc599f46ab1e1d3edbccbfe51",
+      "size": 92556970,
+      "lfs": {
+        "sha256": "a35c1972caeb7f3d59ec295aa03793e2efc2ab076e83c763aec0da652feb95a7",
+        "size": 92556970,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/batio3/defect_classifier.pt",
+      "blobId": "b6d5e539cd157eeb593211fa2c3b401bde58ddcd",
+      "size": 1426180,
+      "lfs": {
+        "sha256": "1801e25526577d2f40c68e13e49501993a8b640930b9e33abf52ca38ec559e78",
+        "size": 1426180,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/batio3/phase_identifier.pt",
+      "blobId": "b94de9b83d8ba326799bf94f1686a4ea1fe7b604",
+      "size": 7723082,
+      "lfs": {
+        "sha256": "b9f73a7d1585b83a21f29f86748d271ea281a6ab835e7fbc38debaaa41a4a64e",
+        "size": 7723082,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/batio3/training_metadata.json",
+      "blobId": "9b022a5e7f7a6652a5cbdd55006a5059d739ab02",
+      "size": 28841
+    },
+    {
+      "rfilename": "checkpoints/transfer/gan/atom_finder.pt",
+      "blobId": "6b6c2da708d59ba3eed1fff7e92666173db4c870",
+      "size": 92556970,
+      "lfs": {
+        "sha256": "8eece3bc00096faeb2a65aeb49b1f16aaa8f34a35844cb97eeda2c2de7b66f6d",
+        "size": 92556970,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/gan/defect_classifier.pt",
+      "blobId": "90533eb0a61f3442e49b7b18533afbd3262f23cd",
+      "size": 1426180,
+      "lfs": {
+        "sha256": "9e441b446c4330af58aefb8ecc8d0b581aee387cddf9574b9c148b1e23bd2e0a",
+        "size": 1426180,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/gan/phase_identifier.pt",
+      "blobId": "de379177c6a3dae0c9d130fdef36d1388f76ba48",
+      "size": 7724106,
+      "lfs": {
+        "sha256": "9abedc1e7a2c57e45ad66c1b34ac35de49eacbba294a07f1760fc612b498c33d",
+        "size": 7724106,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/gan/training_metadata.json",
+      "blobId": "8dd974f9e0ab0a97ec42df05eca57a591aefc8f1",
+      "size": 15016
+    },
+    {
+      "rfilename": "checkpoints/transfer/sige/atom_finder.pt",
+      "blobId": "f916461d9d2e762dff3b96437916021e6f52ca11",
+      "size": 92556970,
+      "lfs": {
+        "sha256": "0d57116ef5e02577ed59343b559bc633189aff4138f62786fdd527c25c1af967",
+        "size": 92556970,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/sige/defect_classifier.pt",
+      "blobId": "57458434f39e0814cd696d3aa6f4edf6dcb18a58",
+      "size": 1426180,
+      "lfs": {
+        "sha256": "d756f1df877413a76dc8734eb280e3a1c3900fd3e7ec7cc0ad560a769545495a",
+        "size": 1426180,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/sige/phase_identifier.pt",
+      "blobId": "083b0130eded243bf9c7b3a8caaf8c33e820ec43",
+      "size": 7724106,
+      "lfs": {
+        "sha256": "4ba9a1bd1a594516a63035ac2a9963d2ce6bf3e7945b4e88a20cbfa9e909f376",
+        "size": 7724106,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/sige/training_metadata.json",
+      "blobId": "bf96e1cbefc9c37275f7ec236edff79a1e59558d",
+      "size": 12109
+    },
+    {
+      "rfilename": "checkpoints/transfer/srtio3/atom_finder.pt",
+      "blobId": "30e52ca73b75780dbd211975876dd235d29a9fa7",
+      "size": 92556970,
+      "lfs": {
+        "sha256": "e540c1ad4ff166b0b1bfc303244622f740eb59ba30abbc28cb734d103c4155c2",
+        "size": 92556970,
+        "pointerSize": 133
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/srtio3/defect_classifier.pt",
+      "blobId": "9b633465218079577dd88010a0c95da3354f3e64",
+      "size": 1426180,
+      "lfs": {
+        "sha256": "f6af4e1309dde199a356750cbd7107eb267a8bd0ae7b4711eabcc09a23d0d3b0",
+        "size": 1426180,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/srtio3/phase_identifier.pt",
+      "blobId": "4c12730d3052f929d6a7ebd88770e05420c32fd4",
+      "size": 7722314,
+      "lfs": {
+        "sha256": "b83170570679f77de6c188b694c79bc89b7cc8309d8ea7b96485b69690f328c5",
+        "size": 7722314,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "checkpoints/transfer/srtio3/training_metadata.json",
+      "blobId": "bc7887a342a6b7a1e71b6cc3b37b3f71aa3c9b08",
+      "size": 27384
+    },
+    {
+      "rfilename": "croissant.json",
+      "blobId": "8238705e62a82107f1ca61e7e6e13280790be41e",
+      "size": 15520
+    },
+    {
+      "rfilename": "worlds/batio3_interface_easy.h5",
+      "blobId": "fec3bee02a28a0eb333b6a98424f5ef4cefac18a",
+      "size": 955321878,
+      "lfs": {
+        "sha256": "a25f2d8b1294eaf7daf61e3de13d6f07cccd837991a829440485e154f0bddb1d",
+        "size": 955321878,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/batio3_interface_hard.h5",
+      "blobId": "2ef949468748c241e5bac375195cb84d7096f9c9",
+      "size": 955321878,
+      "lfs": {
+        "sha256": "a6c9137c6ee4c21f372dd90a005e64163f250a8314791ba1960c1e860e9de875",
+        "size": 955321878,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/batio3_interface_medium.h5",
+      "blobId": "afcb161b1c0ff888922659eeba9461de3ed8a7f1",
+      "size": 955321878,
+      "lfs": {
+        "sha256": "e1535bf06048c5f9f19cbdb9d629dbecb4b3782858fc529ceadc214c8d1f5e2c",
+        "size": 955321878,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/gan_easy.h5",
+      "blobId": "090c4769a854d18b5a34e9b4c83d8f57ad63519b",
+      "size": 472914301,
+      "lfs": {
+        "sha256": "c7f081085921bef21f003da2620abcfc84b5633f77baf958116048eb36cdb5c6",
+        "size": 472914301,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/gan_hard.h5",
+      "blobId": "4c50a03479635414347fcb5842862022d071af02",
+      "size": 469391741,
+      "lfs": {
+        "sha256": "e04c8ff171ad53f2805508d89aa0510e4598d594db2af6d225c597125ec76672",
+        "size": 469391741,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/gan_medium.h5",
+      "blobId": "3633954f8ecee911fd2fc5bcdd73b5f591d9bdab",
+      "size": 470620541,
+      "lfs": {
+        "sha256": "7e4b962a6a86851bf25807e484efe076b45edc87d44c9a8859d5d6f0f5448967",
+        "size": 470620541,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/pt_nanoparticles_easy.h5",
+      "blobId": "af070baeabe28cbff693c12611fc180803060cbf",
+      "size": 134906992,
+      "lfs": {
+        "sha256": "cc4a96546f671602a80c13822217d621b7f2b3d771fbbe704547b89d5b71da8d",
+        "size": 134906992,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/pt_nanoparticles_hard.h5",
+      "blobId": "914321456e08993fd93e55deb230aa553715f260",
+      "size": 134908816,
+      "lfs": {
+        "sha256": "b597404e8de9a74f2904c782677c0756bf8e1a524110d623b1cf72baa79a356a",
+        "size": 134908816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/pt_nanoparticles_medium.h5",
+      "blobId": "718ddccc6107c0f1d5c22e0bbac2e930c5e97869",
+      "size": 134907676,
+      "lfs": {
+        "sha256": "cd75a3b9edf8ef6c46a475e0d3cd3587d2b9ba5b0914326465f711426176b275",
+        "size": 134907676,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/replay_world.h5",
+      "blobId": "60d1ee907bcddab6066b2af586e9b8e538fbb0f2",
+      "size": 2600068,
+      "lfs": {
+        "sha256": "c869377f792a3f3728ae15042c3008ba666cb959d258c067000aa686a42a72e7",
+        "size": 2600068,
+        "pointerSize": 132
+      }
+    },
+    {
+      "rfilename": "worlds/sige_gradient_clustered_easy.h5",
+      "blobId": "cd01dccab67142f6480cac4109344697cf38460c",
+      "size": 156765028,
+      "lfs": {
+        "sha256": "6a3e9671dbade7f9604c5bc58a8bb8c690de2d9cd59d6050200fbde9edca56e9",
+        "size": 156765028,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/sige_gradient_clustered_hard.h5",
+      "blobId": "8299236d98d7fd15fd9b097bf15551df2bb7045d",
+      "size": 153979748,
+      "lfs": {
+        "sha256": "044cf4f20bbd27cfff7cabc85f6e33ae7c5a15fd074d318e1f26f86fb0685774",
+        "size": 153979748,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/sige_gradient_clustered_medium.h5",
+      "blobId": "c6602e70d7843dab919a7cf86171c21d3d2df2e3",
+      "size": 154946404,
+      "lfs": {
+        "sha256": "04d832ac239e2cef7b45e72bf050192fe0a8d75d06ec982068aefe56337142c9",
+        "size": 154946404,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/srtio3_clustered_easy.h5",
+      "blobId": "48159b87daf96c4869ecf34fcea824277094a05e",
+      "size": 927343756,
+      "lfs": {
+        "sha256": "567ccd8acbea2e150a2d43b026a7682af21dc6b2d344463b2bdf49db1c055b9f",
+        "size": 927343756,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/srtio3_clustered_hard.h5",
+      "blobId": "a001676ae3bd7cb9ca778f57ec00cc2954574bfd",
+      "size": 927443816,
+      "lfs": {
+        "sha256": "492d79474521b64ef6bd4ec055579545c460943323f5d55ac71fbc1c8988338e",
+        "size": 927443816,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/srtio3_clustered_medium.h5",
+      "blobId": "40f169e351bd385941638d41221d9379dd5ccdcc",
+      "size": 927343756,
+      "lfs": {
+        "sha256": "1b24c02e1e526f4a5ed6060333faae93ff68b87f920a045371c6bf2b7587c576",
+        "size": 927343756,
+        "pointerSize": 134
+      }
+    },
+    {
+      "rfilename": "worlds/test_world.h5",
+      "blobId": "8338483c02a0ae7a0c6441fe133650f787d813ab",
+      "size": 10119168,
+      "lfs": {
+        "sha256": "f83be90084d151cb36b52e30ca04f474d07d67ffa034397e80f227d2f2228300",
+        "size": 10119168,
+        "pointerSize": 133
+      }
+    }
+  ]
+}

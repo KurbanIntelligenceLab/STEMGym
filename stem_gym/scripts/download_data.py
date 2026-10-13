@@ -1,155 +1,30 @@
-#!/usr/bin/env python3
-"""Download STEMGym data and model checkpoints from Hugging Face.
-
-Usage:
-    python stem_gym/scripts/download_data.py              # download everything
-    python stem_gym/scripts/download_data.py --worlds     # only HDF5 worlds
-    python stem_gym/scripts/download_data.py --checkpoints # only model checkpoints
-    python stem_gym/scripts/download_data.py --transfer   # only transfer checkpoints
-    python stem_gym/scripts/download_data.py --test-only  # only test_world.h5 (minimal)
-"""
-
-from __future__ import annotations
-
+"""Download and verify manuscript worlds and analyst checkpoints."""
 import argparse
-import urllib.request
 from pathlib import Path
-
-HF_DATASET_REPO = "johnpolat/STEMGym"
-HF_BASE_URL = f"https://huggingface.co/datasets/{HF_DATASET_REPO}/resolve/main"
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = PROJECT_ROOT / "data" / "simulated"
-CHECKPOINT_DIR = PROJECT_ROOT / "checkpoints"
-
-WORLD_FILES = [
-    "test_world.h5",
-    "srtio3_clustered_easy.h5",
-    "srtio3_clustered_medium.h5",
-    "srtio3_clustered_hard.h5",
-    "batio3_interface_easy.h5",
-    "batio3_interface_medium.h5",
-    "batio3_interface_hard.h5",
-    "sige_gradient_clustered_easy.h5",
-    "sige_gradient_clustered_medium.h5",
-    "sige_gradient_clustered_hard.h5",
-    "gan_easy.h5",
-    "gan_medium.h5",
-    "gan_hard.h5",
-    "pt_nanoparticles_easy.h5",
-    "pt_nanoparticles_medium.h5",
-    "pt_nanoparticles_hard.h5",
-    "replay_world.h5",
-]
-
-CHECKPOINT_FILES = [
-    "atom_finder.pt",
-    "defect_classifier.pt",
-    "phase_identifier.pt",
-    "dqn_agent.zip",
-    "ppo_agent.zip",
-    "sac_agent.zip",
-]
-
-TRANSFER_MATERIALS = ["srtio3", "batio3", "sige", "gan"]
-TRANSFER_FILES_PER_MATERIAL = [
-    "atom_finder.pt",
-    "defect_classifier.pt",
-    "phase_identifier.pt",
-    "training_metadata.json",
-]
-
-
-def download_file(url: str, dest: Path) -> bool:
-    """Download a file with progress display."""
-    if dest.exists():
-        print(f"  [skip] {dest.name} (already exists)")
-        return True
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".tmp")
-
-    try:
-        print(f"  [download] {dest.name} ...", end="", flush=True)
-        urllib.request.urlretrieve(url, tmp)
-        tmp.rename(dest)
-        size_mb = dest.stat().st_size / (1024 * 1024)
-        print(f" {size_mb:.1f} MB")
-        return True
-    except Exception as e:
-        print(f" FAILED: {e}")
-        if tmp.exists():
-            tmp.unlink()
-        return False
-
-
-def download_worlds(test_only: bool = False) -> int:
-    """Download HDF5 world files. Returns number of failures."""
-    files = ["test_world.h5"] if test_only else WORLD_FILES
-    print(f"\nDownloading world files to {DATA_DIR}/")
-    failures = 0
-    for fname in files:
-        url = f"{HF_BASE_URL}/worlds/{fname}"
-        if not download_file(url, DATA_DIR / fname):
-            failures += 1
-    return failures
-
-
-def download_checkpoints() -> int:
-    """Download model checkpoint files. Returns number of failures."""
-    print(f"\nDownloading checkpoints to {CHECKPOINT_DIR}/")
-    failures = 0
-    for fname in CHECKPOINT_FILES:
-        url = f"{HF_BASE_URL}/checkpoints/{fname}"
-        if not download_file(url, CHECKPOINT_DIR / fname):
-            failures += 1
-    return failures
-
-
-def download_transfer_checkpoints() -> int:
-    """Download transfer-learning checkpoint files. Returns number of failures."""
-    print(f"\nDownloading transfer checkpoints to {CHECKPOINT_DIR}/transfer/")
-    failures = 0
-    for material in TRANSFER_MATERIALS:
-        print(f"  [{material}]")
-        for fname in TRANSFER_FILES_PER_MATERIAL:
-            url = f"{HF_BASE_URL}/checkpoints/transfer/{material}/{fname}"
-            dest = CHECKPOINT_DIR / "transfer" / material / fname
-            if not download_file(url, dest):
-                failures += 1
-    return failures
+from stem_gym.data import download_verified, release_manifest
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download STEMGym data from Hugging Face")
-    parser.add_argument("--worlds", action="store_true", help="Download only world files")
-    parser.add_argument("--checkpoints", action="store_true", help="Download only checkpoints")
-    parser.add_argument("--transfer", action="store_true", help="Download only transfer checkpoints")
-    parser.add_argument("--test-only", action="store_true", help="Download only test_world.h5")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--worlds', action='store_true')
+    parser.add_argument('--checkpoints', action='store_true')
+    parser.add_argument('--test-only', action='store_true')
+    parser.add_argument('--data-dir', type=Path, default=Path('data'))
+    parser.add_argument('--checkpoint-dir', type=Path, default=Path('checkpoints'))
     args = parser.parse_args()
+    manifest = release_manifest()
+    all_files = not (args.worlds or args.checkpoints or args.test_only)
+    for record in manifest['siblings']:
+        remote = record['rfilename']
+        name = Path(remote).name
+        if remote.startswith('worlds/') and (all_files or args.worlds or args.test_only and name in ('test_world.h5', 'replay_world.h5')):
+            destination = args.data_dir / ('replay' if name == 'replay_world.h5' else 'simulated') / name
+        elif remote in ('checkpoints/atom_finder.pt', 'checkpoints/defect_classifier.pt', 'checkpoints/phase_identifier.pt') and (all_files or args.checkpoints):
+            destination = args.checkpoint_dir / name
+        else:
+            continue
+        download_verified(manifest, remote, destination)
+        print(f'{destination}: matches pinned release')
 
-    download_all = not (args.worlds or args.checkpoints or args.transfer or args.test_only)
-
-    print("STEMGym Data Downloader")
-    print(f"Source: huggingface.co/datasets/{HF_DATASET_REPO}")
-
-    failures = 0
-
-    if download_all or args.worlds or args.test_only:
-        failures += download_worlds(test_only=args.test_only)
-
-    if download_all or args.checkpoints:
-        failures += download_checkpoints()
-
-    if download_all or args.transfer:
-        failures += download_transfer_checkpoints()
-
-    if failures:
-        print(f"\nWARNING: {failures} download(s) failed (some files may not be available yet).")
-        print("Continuing with available files...")
-    else:
-        print("\nAll downloads complete.")
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
