@@ -1,9 +1,3 @@
-"""Random baseline: random positions + default acquisition params.
-
-Lower bound on performance. Acquires at random positions with no
-strategy. Uses SimpleAnalyst to produce findings for scoring.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -16,11 +10,7 @@ from stem_gym.envs.stem_env import ActionType
 
 
 class RandomAgent(Agent):
-    """Random baseline agent.
 
-    Each step: navigate to a random position, then acquire.
-    After all acquisitions, declares findings based on SimpleAnalyst.
-    """
 
     def __init__(self, seed: int = 42):
         self.seed = seed
@@ -28,7 +18,7 @@ class RandomAgent(Agent):
         self.analyst = SimpleAnalyst()
         self._fov: tuple[float, float] = (1.0, 1.0)
         self._step = 0
-        self._navigate_phase = True  # alternate navigate → acquire
+        self._navigate_phase = True
 
     def reset(self, obs: dict[str, np.ndarray], info: dict[str, Any], *, seed: int | None = None) -> None:
         self.rng = np.random.default_rng(self.seed if seed is None else seed)
@@ -44,14 +34,14 @@ class RandomAgent(Agent):
         self._step += 1
         budget_frac = float(obs["budget_remaining"][0])
 
-        # If nearly out of budget, declare and stop
+
         if budget_frac < 0.05:
             return self._make_done_action()
 
         if self._navigate_phase:
-            # Navigate to random position
+
             self._navigate_phase = False
-            # Random position within the FOV
+
             fov_h, fov_w = self._fov
             x = self.rng.uniform(0, fov_w)
             y = self.rng.uniform(0, fov_h)
@@ -63,7 +53,7 @@ class RandomAgent(Agent):
                 "finding_type": 0,
             }
         else:
-            # Acquire at current position
+
             self._navigate_phase = True
             return {
                 "action_type": ActionType.ACQUIRE,

@@ -1,4 +1,3 @@
-"""Bounded training checks; convergence tests remain in test_analyst.py."""
 from pathlib import Path
 
 import numpy as np

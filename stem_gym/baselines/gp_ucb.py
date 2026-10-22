@@ -1,12 +1,3 @@
-"""GP-UCB baseline: Gaussian Process Upper Confidence Bound.
-
-Single-agent GP-UCB over the spatial (x, y) domain. Acquires at every
-navigated position. Models tile "interestingness" (intensity variance)
-as the objective to maximize — explores high-variance regions first.
-
-This supplies the GP navigation used by the manuscript reference evaluator.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -20,18 +11,7 @@ from stem_gym.envs.stem_env import ActionType
 
 
 class GPUCBAgent(Agent):
-    """GP-UCB agent over spatial domain.
 
-    Maintains a GP model of tile interestingness (intensity variance as
-    proxy for information content). Uses UCB acquisition function to
-    select next position. Always acquires at the selected position.
-
-    Args:
-        beta: UCB exploration parameter. Higher = more exploration.
-        seed: Random seed.
-        initial_random: Number of initial random acquisitions before
-            fitting the GP (need ≥2 points).
-    """
 
     def __init__(
         self,
@@ -47,9 +27,9 @@ class GPUCBAgent(Agent):
         self.analyst = SimpleAnalyst()
         self.rng = np.random.default_rng(seed)
 
-        # GP data
-        self._X: list[list[float]] = []  # observed positions (normalized)
-        self._Y: list[float] = []         # observed interestingness values
+
+        self._X: list[list[float]] = []
+        self._Y: list[float] = []
         self._grid_shape: tuple[int, int] = (1, 1)
         self._fov_nm: tuple[float, float] = (1.0, 1.0)
         self._navigate_phase = True
@@ -88,7 +68,7 @@ class GPUCBAgent(Agent):
         train_X = torch.tensor(self._X, dtype=torch.float64, device=_device)
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1)
 
-        # Normalize Y
+
         y_mean = train_Y.mean()
         y_std = train_Y.std().clamp(min=1e-6)
         train_Y_norm = (train_Y - y_mean) / y_std
@@ -100,7 +80,7 @@ class GPUCBAgent(Agent):
             )
             fit_gpytorch_mll(mll, optimizer_kwargs={"options": {"maxiter": 50}})
         except Exception:
-            # Fall back to unfitted model if optimization fails
+
             self._gp_model = SingleTaskGP(train_X, train_Y_norm)
 
     def _select_next_position(self, obs: dict[str, np.ndarray]) -> tuple[float, float]:
@@ -108,7 +88,7 @@ class GPUCBAgent(Agent):
         grid_h, grid_w = self._grid_shape
         visited = obs["visited_mask"]
 
-        # If no GP yet, pick random unvisited tile
+
         if self._gp_model is None or self._step < self.initial_random:
             unvisited = np.argwhere(visited < 0.5)
             if len(unvisited) == 0:
@@ -117,7 +97,7 @@ class GPUCBAgent(Agent):
             row, col = unvisited[idx]
             return self._grid_to_nm(int(row), int(col))
 
-        # Evaluate UCB over all unvisited tiles
+
         candidates = []
         for r in range(grid_h):
             for c in range(grid_w):
@@ -125,12 +105,12 @@ class GPUCBAgent(Agent):
                     candidates.append((r, c))
 
         if not candidates:
-            # All visited — pick random
+
             r = self.rng.integers(0, grid_h)
             c = self.rng.integers(0, grid_w)
             return self._grid_to_nm(r, c)
 
-        # Normalize candidate positions to [0, 1] on same device as GP
+
         _device = next(self._gp_model.parameters()).device
         cand_norm = torch.tensor(
             [[r / max(grid_h - 1, 1), c / max(grid_w - 1, 1)] for r, c in candidates],
@@ -138,7 +118,7 @@ class GPUCBAgent(Agent):
             device=_device,
         )
 
-        # Compute acquisition function values
+
         from stem_gym.agents.acquisition import evaluate_acquisition
         train_Y = torch.tensor(self._Y, dtype=torch.float64, device=_device).unsqueeze(-1) if self._Y else None
         acq_values = evaluate_acquisition(
@@ -168,11 +148,7 @@ class GPUCBAgent(Agent):
         return row, col
 
     def _tile_interestingness(self, tile: np.ndarray) -> float:
-        """Compute interestingness score for a tile.
-
-        Uses intensity variance as proxy — tiles with high variance
-        likely contain defects or features of interest.
-        """
+        """Compute interestingness score for a tile."""
         if tile.max() <= 0:
             return 0.0
         return float(np.std(tile))
@@ -185,7 +161,7 @@ class GPUCBAgent(Agent):
             return self._make_done_action()
 
         if self._navigate_phase:
-            # Select position via GP-UCB
+
             x_nm, y_nm = self._select_next_position(obs)
             self._navigate_phase = False
             return {
@@ -196,7 +172,7 @@ class GPUCBAgent(Agent):
                 "finding_type": 0,
             }
         else:
-            # Acquire and analyze
+
             self._navigate_phase = True
 
             return {

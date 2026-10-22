@@ -1,5 +1,3 @@
-"""Pinned dataset retrieval with verification before publication to the cache."""
-
 import hashlib
 import json
 from pathlib import Path

@@ -1,5 +1,3 @@
-"""Protect reference files and validate source identities."""
-
 from pathlib import Path
 import hashlib
 import json
@@ -8,6 +6,9 @@ import zipfile
 
 def writable_output(path: Path, root: Path) -> Path:
     resolved = path.resolve()
+    runs = root.resolve() / "development/runs"
+    if resolved == runs or runs in resolved.parents:
+        return resolved
     for directory in ("results/manuscript", "development"):
         protected = (root / directory).resolve()
         if resolved == protected or protected in resolved.parents:

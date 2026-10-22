@@ -1,5 +1,3 @@
-"""Coordinate transforms shared by environments and acquisition policies."""
-
 from dataclasses import dataclass
 import numpy as np
 

@@ -1,5 +1,3 @@
-"""Verify pinned release files and HDF5 records; download absent worlds only."""
-
 from pathlib import Path
 import concurrent.futures
 import hashlib

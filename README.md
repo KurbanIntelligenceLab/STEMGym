@@ -29,7 +29,7 @@ For CUDA simulation on Linux x86-64, add `--extra cuda` alongside `--extra sim`.
 
 ## Data and reference results
 
-Worlds and checkpoints are hosted on [Hugging Face](https://huggingface.co/datasets/kurbanintelligencelab/stemgym/tree/aa12b7380fed7a4362a18aa67df1ea135f7e15ff). Downloads are pinned to that revision and checked against SHA-256 hashes before publication to the local cache. Existing mismatched files cause an error and are not overwritten.
+Worlds and checkpoints are hosted on [Hugging Face](https://huggingface.co/datasets/kurbanintelligencelab/stemgym). Downloads use revision `aa12b7380fed7a4362a18aa67df1ea135f7e15ff` and are checked against SHA-256 hashes before publication to the local cache. Existing mismatched files cause an error and are not overwritten.
 
 ```sh
 uv run --locked stemgym-download
@@ -52,7 +52,7 @@ uv run --locked python reproducibility/build_figures.py
 uv run --locked python reproducibility/verify_reference.py --artifacts-dir results/generated
 ```
 
-Run the current complete reference protocol into a new results file:
+Run a new evaluation with the current implementation:
 
 ```sh
 uv run --locked python reproducibility/evaluate_reference.py --output results/runs/reference.json
@@ -60,7 +60,7 @@ uv run --locked python reproducibility/build_figures.py --results results/runs/r
 uv run --locked python reproducibility/verify_reference.py --results results/runs/reference.json --artifacts-dir results/generated-current
 ```
 
-The evaluator resumes one JSON file per run. It refuses to resume when its source, imported implementation, lockfile, or seed count changes. Use `CUDA_VISIBLE_DEVICES=""` for CPU-only GP fitting. Analyst inference uses CPU.
+The reported study uses the exact evaluator and runtime in [`results/manuscript/reference_source.zip`](results/manuscript/reference_source.zip); see the [reproduction instructions](results/manuscript/README.md). The current evaluator records protocol version 2 and its own source identity. The evaluator resumes one JSON file per run. It refuses to resume when its source, imported implementation, lockfile, or seed count changes. Use `CUDA_VISIBLE_DEVICES=""` for CPU-only GP fitting. Analyst inference uses CPU.
 
 ## Implementation
 
@@ -91,7 +91,7 @@ uv run --locked python reproducibility/package_source.py
 uv build --out-dir dist
 ```
 
-The source archive is `dist/stemgym_source.zip`; every included file is rechecked against its embedded hash manifest. The wheel is the runtime library and download CLI, with the pinned dataset manifest included. The source distribution and archive additionally include reproduction scripts, tests, lockfile and reference evidence.
+The source archive is `dist/stemgym_mlst_source.zip`; every included file is rechecked against its embedded hash manifest. The wheel is the runtime library and download CLI, with the pinned dataset manifest included. The source distribution and archive additionally include reproduction scripts, tests, lockfile and reference evidence.
 
 ## License
 

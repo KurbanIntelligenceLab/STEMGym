@@ -1,5 +1,3 @@
-"""Task definitions for STEMGym."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -10,10 +8,7 @@ import numpy as np
 
 
 class Task(ABC):
-    """Base class for STEMGym evaluation tasks.
 
-    A task defines how agent findings are scored against ground truth.
-    """
 
     @property
     @abstractmethod
@@ -22,20 +17,12 @@ class Task(ABC):
 
     @abstractmethod
     def score(self, findings: dict[str, Any], ground_truth: dict[str, Any]) -> float:
-        """Score agent findings against ground truth.
-
-        Args:
-            findings: Agent's declared findings (from ExperimentState).
-            ground_truth: Ground truth from the world file.
-
-        Returns:
-            Score in [0, 1]. Higher is better.
-        """
+        """Score agent findings against ground truth."""
 
 
 @dataclass
 class DummyTask(Task):
-    """Zero-score task for environment tests."""
+
 
     @property
     def name(self) -> str:

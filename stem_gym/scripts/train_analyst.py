@@ -1,26 +1,3 @@
-#!/usr/bin/env python3
-"""Train the analyst ensemble (AtomFinder + DefectClassifier + PhaseIdentifier).
-
-Generates training data from HDF5 world files, trains all three models,
-and saves checkpoints.
-
-Usage:
-    uv run --locked python stem_gym/scripts/train_analyst.py --world data/simulated/test_world.h5 \
-                                             --output checkpoints/ \
-                                             --epochs 30
-
-For multi-world training:
-    uv run --locked python stem_gym/scripts/train_analyst.py \
-        --world data/simulated/srtio3_clustered_easy.h5 \
-        --world data/simulated/batio3_interface_easy.h5 \
-        --world data/simulated/sige_gradient_clustered_easy.h5 \
-        --output checkpoints/ --device cuda
-
-Phase training auto-detects worlds with phase maps. Override with:
-    --phase-world data/simulated/batio3_interface_easy.h5 \
-    --phase-world data/simulated/gan_easy.h5
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -46,21 +23,8 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Dataset: tiles + ground truth from HDF5 worlds
-# ---------------------------------------------------------------------------
-
 class TileDataset(Dataset):
-    """Dataset of tiles with atom position ground truth from HDF5 worlds.
 
-    For each tile, generates:
-        - tile image (128x128, normalized)
-        - atom probability map (128x128, Gaussian blobs at atom positions)
-        - per-atom defect labels
-        - phase label
-
-    Loads tiles lazily from disk for large worlds, but caches atom maps.
-    """
 
     def __init__(
         self,
@@ -72,12 +36,12 @@ class TileDataset(Dataset):
         self.augment = augment
         self.atom_sigma = atom_sigma
 
-        # Per-tile metadata (lightweight)
-        self.tile_refs: list[dict] = []  # {path, row, col, tile_size, stride, pixel_size}
+
+        self.tile_refs: list[dict] = []
         self.atom_maps: list[np.ndarray] = []
         self.defect_patches: list[list[tuple[np.ndarray, int]]] = []
         self.phase_labels: list[int] = []
-        self.world_indices: list[int] = []  # which world each tile came from
+        self.world_indices: list[int] = []
 
         for i, path in enumerate(world_paths):
             self._load_world(path, world_idx=i, max_tiles=max_tiles_per_world)
@@ -94,21 +58,21 @@ class TileDataset(Dataset):
             grid_shape = tuple(meta.attrs["grid_shape"])
             stride = tile_size - overlap
 
-            # Load ground truth
-            gt = f["ground_truth"]
-            atom_positions = np.array(gt["atom_positions"])  # (N, 2) in nm (x, y)
-            atom_types = np.array(gt["atom_types"])           # 0=normal,1=vac,2=sub
 
-            # Phase map if available
+            gt = f["ground_truth"]
+            atom_positions = np.array(gt["atom_positions"])
+            atom_types = np.array(gt["atom_types"])
+
+
             phase_map = None
             if "phase_map" in gt:
                 phase_map = np.array(gt["phase_map"])
 
-            # Build tile list
+
             tile_coords = [(r, c) for r in range(grid_shape[0]) for c in range(grid_shape[1])
                            if f"tiles/{r}_{c}" in f]
 
-            # Subsample if requested
+
             if max_tiles > 0 and len(tile_coords) > max_tiles:
                 rng = np.random.default_rng(42 + world_idx)
                 indices = rng.choice(len(tile_coords), max_tiles, replace=False)
@@ -117,7 +81,7 @@ class TileDataset(Dataset):
             for r, c in tile_coords:
                 tile = np.array(f[f"tiles/{r}_{c}"], dtype=np.float32)
 
-                # Tile bounds in nm
+
                 y0_px = r * stride
                 x0_px = c * stride
                 x0_nm = x0_px * pixel_size
@@ -125,7 +89,7 @@ class TileDataset(Dataset):
                 x1_nm = (x0_px + tile_size) * pixel_size
                 y1_nm = (y0_px + tile_size) * pixel_size
 
-                # Find atoms within this tile
+
                 in_tile = (
                     (atom_positions[:, 0] >= x0_nm) &
                     (atom_positions[:, 0] < x1_nm) &
@@ -135,7 +99,7 @@ class TileDataset(Dataset):
                 tile_atom_pos = atom_positions[in_tile]
                 tile_atom_types = atom_types[in_tile]
 
-                # Create atom probability map
+
                 atom_map = np.zeros((tile_size, tile_size), dtype=np.float32)
                 for pos in tile_atom_pos:
                     px_c = (pos[0] - x0_nm) / pixel_size
@@ -148,7 +112,7 @@ class TileDataset(Dataset):
                     atom_map = gaussian_filter(atom_map, sigma=self.atom_sigma)
                     atom_map /= atom_map.max()
 
-                # Defect patches (32x32 around each atom)
+
                 patches = []
                 for pos, atype in zip(tile_atom_pos, tile_atom_types):
                     px_c = int(round((pos[0] - x0_nm) / pixel_size))
@@ -159,7 +123,7 @@ class TileDataset(Dataset):
                         if patch.shape == (32, 32):
                             patches.append((patch, int(atype)))
 
-                # Phase label
+
                 phase_label = 0
                 if phase_map is not None:
                     center_r = y0_px + tile_size // 2
@@ -177,7 +141,7 @@ class TileDataset(Dataset):
                 self.phase_labels.append(phase_label)
                 self.world_indices.append(world_idx)
 
-                # Store tile data in ref for retrieval
+
                 self.tile_refs[-1]["tile_data"] = tile
 
     def __len__(self) -> int:
@@ -188,7 +152,7 @@ class TileDataset(Dataset):
         atom_map = self.atom_maps[idx].copy()
         phase_label = self.phase_labels[idx]
 
-        # Normalize tile
+
         t_min, t_max = tile.min(), tile.max()
         if t_max > t_min:
             tile = (tile - t_min) / (t_max - t_min)
@@ -214,10 +178,7 @@ class TileDataset(Dataset):
 
 
 class DefectPatchDataset(Dataset):
-    """Flat dataset of 32x32 defect patches extracted from TileDataset.
 
-    Supports max_patches with class-balanced subsampling.
-    """
 
     def __init__(
         self,
@@ -227,7 +188,7 @@ class DefectPatchDataset(Dataset):
     ):
         self.augment = augment
 
-        # Collect all patches
+
         all_patches: list[np.ndarray] = []
         all_labels: list[int] = []
         for patches in tile_dataset.defect_patches:
@@ -235,7 +196,7 @@ class DefectPatchDataset(Dataset):
                 all_patches.append(patch)
                 all_labels.append(label)
 
-        # Subsample with class balance if needed
+
         if max_patches > 0 and len(all_patches) > max_patches:
             logger.info(f"Subsampling {len(all_patches)} patches to {max_patches} (class-balanced)")
             all_patches, all_labels = self._balanced_subsample(
@@ -263,7 +224,7 @@ class DefectPatchDataset(Dataset):
         n_classes = len(counts)
         per_class = max_patches // n_classes
 
-        # Group by class
+
         by_class: dict[int, list[int]] = {}
         for i, lbl in enumerate(labels):
             by_class.setdefault(lbl, []).append(i)
@@ -275,7 +236,7 @@ class DefectPatchDataset(Dataset):
             else:
                 selected.extend(rng.choice(indices, per_class, replace=False).tolist())
 
-        # Fill remaining budget from majority class
+
         remaining = max_patches - len(selected)
         if remaining > 0:
             unselected = list(set(range(len(labels))) - set(selected))
@@ -308,10 +269,6 @@ class DefectPatchDataset(Dataset):
         )
 
 
-# ---------------------------------------------------------------------------
-# Training loops
-# ---------------------------------------------------------------------------
-
 def train_atom_finder(
     dataset: TileDataset,
     n_members: int = 3,
@@ -326,7 +283,7 @@ def train_atom_finder(
 
     ensemble = AtomFinderEnsemble(n_members=n_members).to(device)
 
-    # Split data
+
     n_val = max(1, len(dataset) // 5)
     n_train = len(dataset) - n_val
     train_ds, val_ds = random_split(
@@ -402,7 +359,7 @@ def train_atom_finder(
                 logger.info(f"  Member {member_idx+1} early stopping at epoch {epoch+1}")
                 break
 
-        # Restore best model
+
         if best_state is not None:
             model.load_state_dict(best_state)
             logger.info(f"  Member {member_idx+1} restored best model (val_loss={best_val_loss:.4f})")
@@ -442,7 +399,7 @@ def train_defect_classifier(
     model = DefectClassifierCNN().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    # Class weights for imbalanced data
+
     label_counts = Counter(patch_ds.labels)
     n_classes = 4
     weights = torch.ones(n_classes)
@@ -484,7 +441,7 @@ def train_defect_classifier(
         train_loss /= max(total_samples, 1)
         train_acc = correct / max(total_samples, 1)
 
-        # Validate
+
         model.eval()
         val_loss = 0.0
         val_correct = 0
@@ -541,23 +498,17 @@ def train_phase_identifier(
     device: str = "cpu",
     patience: int = 7,
 ) -> tuple["PhaseIdentifierResNet", dict]:
-    """Train the phase identifier ResNet.
-
-    Args:
-        phase_world_indices: If provided, only use tiles from these worlds.
-            Worlds without phase maps are auto-excluded.
-        n_phases: Number of phase classes. Auto-detected if 0.
-    """
+    """Train the phase identifier ResNet."""
     from stem_gym.agents.models import PhaseIdentifierResNet
 
-    # Filter to only tiles from phase worlds
+
     if phase_world_indices is not None:
         valid_idx = [i for i, w in enumerate(tile_dataset.world_indices)
                      if w in phase_world_indices]
     else:
         valid_idx = list(range(len(tile_dataset)))
 
-    # Auto-detect n_phases from labels of valid tiles
+
     phase_labels_valid = [tile_dataset.phase_labels[i] for i in valid_idx]
     unique_phases = sorted(set(phase_labels_valid))
 
@@ -569,7 +520,7 @@ def train_phase_identifier(
         n_phases = max(unique_phases) + 1
     logger.info(f"Phase training: {len(valid_idx)} tiles, {n_phases} phases, labels={unique_phases}")
 
-    # Create subset
+
     subset = Subset(tile_dataset, valid_idx)
     n_val = max(1, len(subset) // 5)
     n_train = len(subset) - n_val
@@ -660,10 +611,6 @@ def train_phase_identifier(
     return model, metadata
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def detect_phase_worlds(world_paths: list[Path]) -> list[int]:
     """Return indices of worlds that have a multi-valued phase_map in GT."""
     phase_indices = []
@@ -680,10 +627,6 @@ def detect_phase_worlds(world_paths: list[Path]) -> list[int]:
                 logger.info(f"  Skipping {path.name} for phase training (no phase_map)")
     return phase_indices
 
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser(description="Train STEMGym analyst ensemble")
@@ -712,16 +655,16 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
 
-    # Load data
+
     logger.info(f"Loading data from {len(args.world)} worlds...")
     dataset = TileDataset(
         args.world, augment=True,
         max_tiles_per_world=args.max_tiles_per_world,
     )
 
-    # Detect phase worlds
+
     if args.phase_world:
-        # Map phase-world paths to indices in args.world
+
         phase_world_indices = []
         for pw in args.phase_world:
             for i, w in enumerate(args.world):
@@ -739,7 +682,7 @@ def main():
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-    # Train AtomFinder ensemble
+
     logger.info("=" * 50)
     logger.info("Training AtomFinder ensemble...")
     atom_finder, af_meta = train_atom_finder(
@@ -751,7 +694,7 @@ def main():
     all_metadata["atom_finder"] = af_meta
     logger.info("Saved atom_finder.pt")
 
-    # Train DefectClassifier
+
     logger.info("=" * 50)
     logger.info("Training DefectClassifier...")
     defect_clf, dc_meta = train_defect_classifier(
@@ -763,7 +706,7 @@ def main():
     all_metadata["defect_classifier"] = dc_meta
     logger.info("Saved defect_classifier.pt")
 
-    # Train PhaseIdentifier
+
     logger.info("=" * 50)
     logger.info("Training PhaseIdentifier...")
     phase_id, pi_meta = train_phase_identifier(
@@ -776,7 +719,7 @@ def main():
     all_metadata["phase_identifier"] = pi_meta
     logger.info("Saved phase_identifier.pt")
 
-    # Save training metadata
+
     elapsed = time.time() - t_start
     all_metadata["total_training_seconds"] = round(elapsed, 1)
     with open(args.output / "training_metadata.json", "w") as f:

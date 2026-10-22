@@ -1,5 +1,3 @@
-"""Independently verify a selected run and its generated tables and summary."""
-
 from pathlib import Path
 import argparse
 import hashlib
@@ -84,8 +82,8 @@ def verify(results_path, artifacts_dir=None):
         )
         if not np.all((scores >= 0) & (scores <= 1)):
             raise ValueError("Validation failed: np.all((scores >= 0) & (scores <= 1))")
-        # Interpolation may differ by a few ULPs across NumPy builds/CPUs.
-        # Use the same absolute precision as the independent integral checks.
+
+
         if not (
             np.allclose(x, e["dec_dose_fractions"], rtol=0, atol=1e-12)
             and np.allclose(scores, e["dec_scores"], rtol=0, atol=1e-12)
@@ -161,7 +159,7 @@ def verify(results_path, artifacts_dir=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Verify reference results and generated tables.')
     parser.add_argument(
         "--results", type=Path, default=EVIDENCE / "reference_results.json"
     )

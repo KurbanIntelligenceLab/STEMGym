@@ -1,5 +1,3 @@
-"""DEC (Dose-Efficiency Curve) metrics for STEMGym."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,11 +7,11 @@ import numpy as np
 
 @dataclass
 class DECResult:
-    """Result of a DEC computation."""
-    dose_fractions: np.ndarray   # (K,) dose fraction checkpoints [0, 1]
-    scores: np.ndarray           # (K,) task scores at each checkpoint
-    auc: float                   # Area under the DEC curve (normalized to [0, 1])
-    time_to_threshold: float | None  # dose fraction to reach threshold (None if never)
+
+    dose_fractions: np.ndarray
+    scores: np.ndarray
+    auc: float
+    time_to_threshold: float | None
 
 
 def compute_dec(
@@ -22,19 +20,7 @@ def compute_dec(
     n_checkpoints: int = 50,
     threshold: float = 0.8,
 ) -> DECResult:
-    """Compute the Dose-Efficiency Curve from an episode log.
-
-    Args:
-        episode_log: List of dicts with keys:
-            - "dose_used": cumulative dose at this step
-            - "task_score": task score at this step (can be None for intermediate steps)
-        total_budget: Total dose budget for normalization.
-        n_checkpoints: Number of evenly-spaced dose fraction checkpoints.
-        threshold: Score threshold for time-to-threshold metric.
-
-    Returns:
-        DECResult with dose fractions, scores, AUC, and time-to-threshold.
-    """
+    """Compute the Dose-Efficiency Curve from an episode log."""
     if not episode_log:
         dose_fracs = np.linspace(0, 1, n_checkpoints)
         return DECResult(
@@ -44,7 +30,7 @@ def compute_dec(
             time_to_threshold=None,
         )
 
-    # Extract (dose_fraction, score) pairs — only entries with scores
+
     scored_entries = []
     for entry in episode_log:
         score = entry.get("task_score")
@@ -61,20 +47,20 @@ def compute_dec(
             time_to_threshold=None,
         )
 
-    # Sort by dose fraction
+
     scored_entries.sort(key=lambda x: x[0])
     dose_vals = np.array([e[0] for e in scored_entries])
     score_vals = np.array([e[1] for e in scored_entries])
 
-    # Interpolate to uniform checkpoints
+
     dose_fracs = np.linspace(0, 1, n_checkpoints)
     scores = np.interp(dose_fracs, dose_vals, score_vals, left=0.0, right=score_vals[-1])
 
-    # AUC via trapezoidal rule
+
     _trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
     auc = float(_trapz(scores, dose_fracs))
 
-    # Time to threshold
+
     above = np.where(scores >= threshold)[0]
     time_to_thresh = float(dose_fracs[above[0]]) if len(above) > 0 else None
 

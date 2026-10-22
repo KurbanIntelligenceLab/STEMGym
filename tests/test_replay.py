@@ -1,5 +1,3 @@
-"""Replay world and agent integration tests."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,8 +29,6 @@ def sim_path():
         pytest.skip("Simulated test world not generated")
     return SIM_WORLD
 
-
-# ---- ReplayWorld unit tests ----
 
 class TestReplayWorld:
     def test_opens_and_has_metadata(self, replay_path):
@@ -84,8 +80,6 @@ class TestReplayWorld:
         w.close()
 
 
-# ---- Env integration ----
-
 class TestReplayEnv:
     def test_env_works_with_replay(self, replay_path):
         """STEMEnv should work with replay world files."""
@@ -96,7 +90,7 @@ class TestReplayEnv:
         assert obs["budget_remaining"][0] > 0
         assert info["fov_nm"][0] > 0
 
-        # Navigate + acquire
+
         action = {
             "action_type": ActionType.NAVIGATE,
             "position": np.array([info["fov_nm"][1] / 2, info["fov_nm"][0] / 2],
@@ -113,10 +107,8 @@ class TestReplayEnv:
         env.close()
 
 
-# ---- Agents on replay ----
-
 class TestAgentsOnReplay:
-    """Run all agents on replay data and verify they produce scores."""
+
 
     def test_random_agent_on_replay(self, replay_path):
         from stem_gym.baselines.random_agent import RandomAgent
@@ -169,16 +161,8 @@ class TestAgentsOnReplay:
         env.close()
 
 
-# ---- Ranking correlation ----
-
 class TestRankingCorrelation:
-    """Verify agent rankings on replay correlate with simulation rankings.
 
-    On the synthetic replay world (which has similar structure to the
-    simulated test world), agent rankings should be broadly consistent.
-    Both are uniform lattices with random defects, so all agents perform
-    similarly — the key check is that all agents produce valid results.
-    """
 
     def test_all_agents_produce_scores_on_replay(self, replay_path):
         """All agents should produce non-negative DEC-AUC on replay."""
@@ -211,13 +195,13 @@ class TestRankingCorrelation:
             print(f"    {name:12s}: {bench.mean_dec_auc:.4f} ± {bench.std_dec_auc:.4f}"
                   f"  (tiles={bench.mean_tiles:.1f})")
 
-        # All agents should produce non-negative DEC-AUC
+
         for name, bench in results.items():
             assert bench.mean_dec_auc >= 0.0, (
                 f"{name} DEC-AUC should be >= 0 on replay, got {bench.mean_dec_auc}"
             )
 
-        # All agents should acquire tiles
+
         for name, bench in results.items():
             assert bench.mean_tiles > 0, f"{name} should acquire tiles on replay"
 

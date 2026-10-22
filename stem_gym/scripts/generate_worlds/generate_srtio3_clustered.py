@@ -1,23 +1,3 @@
-#!/usr/bin/env python3
-"""Generate SrTiO3 clustered-defect scenario: O vacancies along a grain boundary.
-
-Material: SrTiO3 (mp-5229), [001] zone axis, ~100nm FOV
-Defects: O vacancies concentrated along a diagonal grain boundary
-Task: Defect Census (tests whether adaptive agents exploit spatial clustering)
-
-The grain boundary runs diagonally across the field of view.  Vacancy
-density is highest near the boundary (Gaussian fall-off) and low in the
-bulk.  This is the simplest clustered-defect world: identical to the
-uniform SrTiO3 generator except step 3 uses weighted vacancy planting.
-
-Usage:
-    uv run --locked --extra sim python stem_gym/scripts/generate_worlds/generate_srtio3_clustered.py [--difficulty easy|medium|hard]
-                                                      [--output data/simulated/srtio3_clustered.h5]
-                                                      [--device cpu|gpu]
-                                                      [--mp-api-key KEY]
-                                                      [--seed 42]
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -46,11 +26,10 @@ from sim_utils import (
     DIFFICULTY_PARAMS,
 )
 
-# SrTiO3 lattice parameter
-STO_A = 3.905  # Angstrom, cubic perovskite
 
-# Debye-Waller factors (RMS displacement in Angstrom) for SrTiO3
-# From: Abramov et al., Acta Cryst. B 51, 942-951, 1995 (values at 296 K)
+STO_A = 3.905
+
+
 STO_PHONON_SIGMAS = {
     "Sr": 0.084,
     "Ti": 0.060,
@@ -59,22 +38,16 @@ STO_PHONON_SIGMAS = {
 
 
 def build_srtio3_unit_cell() -> Atoms:
-    """Build SrTiO3 cubic perovskite unit cell.
-
-    Layout (cubic, a=3.905 Å):
-        Sr at corners: (0, 0, 0)
-        Ti at body center: (0.5, 0.5, 0.5)
-        O at face centers: (0.5, 0.5, 0), (0.5, 0, 0.5), (0, 0.5, 0.5)
-    """
+    """Build SrTiO3 cubic perovskite unit cell."""
     a = STO_A
     atoms = Atoms(
         symbols=["Sr", "Ti", "O", "O", "O"],
         positions=[
-            [0.0, 0.0, 0.0],           # Sr
-            [a/2, a/2, a/2],            # Ti
-            [a/2, a/2, 0.0],            # O (xy face)
-            [a/2, 0.0, a/2],            # O (xz face)
-            [0.0, a/2, a/2],            # O (yz face)
+            [0.0, 0.0, 0.0],
+            [a/2, a/2, a/2],
+            [a/2, a/2, 0.0],
+            [a/2, 0.0, a/2],
+            [0.0, a/2, a/2],
         ],
         cell=[a, a, a],
         pbc=True,
@@ -92,14 +65,14 @@ def build_srtio3_from_mp(api_key: str | None = None) -> Atoms:
         logger.warning(f"Could not fetch from MP ({e}), using built-in unit cell")
         return build_srtio3_unit_cell()
 
-# Difficulty params for clustered SrTiO3
+
 CLUSTERED_DIFFICULTY = {
     "easy":   {"vacancy_rate": 0.05, "cluster_fraction": 0.60, "line_width_frac": 0.08},
     "medium": {"vacancy_rate": 0.03, "cluster_fraction": 0.70, "line_width_frac": 0.05},
     "hard":   {"vacancy_rate": 0.01, "cluster_fraction": 0.80, "line_width_frac": 0.03},
 }
 
-# Grain boundary line endpoints in fractional cell coordinates (x, y)
+
 GB_START = np.array([0.15, 0.35])
 GB_END = np.array([0.85, 0.65])
 
@@ -108,19 +81,7 @@ def compute_grain_boundary_weights(
     atoms,
     line_width_frac: float,
 ) -> np.ndarray:
-    """Compute per-O-atom weights based on distance to diagonal grain boundary.
-
-    The grain boundary is a line from GB_START to GB_END in fractional
-    cell coordinates.  Weights are Gaussian: w = exp(-d^2 / 2*sigma^2).
-
-    Args:
-        atoms: Structure containing O atoms.
-        line_width_frac: Standard deviation of the Gaussian, as a fraction
-                         of the cell diagonal length.
-
-    Returns:
-        weights array of length == number of O atoms.
-    """
+    """Compute per-O-atom weights based on distance to diagonal grain boundary."""
     positions = atoms.get_positions()
     symbols = np.array(atoms.get_chemical_symbols())
     o_mask = symbols == "O"
@@ -129,21 +90,20 @@ def compute_grain_boundary_weights(
     cell_x = atoms.cell[0, 0]
     cell_y = atoms.cell[1, 1]
 
-    # Convert grain boundary endpoints to Angstrom
+
     p0 = GB_START * np.array([cell_x, cell_y])
     p1 = GB_END * np.array([cell_x, cell_y])
 
-    # Line direction and length
+
     line_vec = p1 - p0
     line_len = np.linalg.norm(line_vec)
     line_dir = line_vec / line_len
 
-    # Perpendicular distance from each O atom to the line
-    # d = |((p - p0) x line_dir)|  (2D cross product magnitude)
-    dp = o_positions[:, :2] - p0  # (N, 2)
+
+    dp = o_positions[:, :2] - p0
     cross = np.abs(dp[:, 0] * line_dir[1] - dp[:, 1] * line_dir[0])
 
-    # Sigma in Angstrom
+
     diag_len = np.sqrt(cell_x**2 + cell_y**2)
     sigma = line_width_frac * diag_len
 
@@ -162,19 +122,7 @@ def generate_srtio3_clustered(
     total_shards: int | None = None,
     merge_shards: int | None = None,
 ) -> Path:
-    """Generate SrTiO3 world with clustered O vacancies along a grain boundary.
-
-    Args:
-        difficulty: "easy", "medium", or "hard".
-        output_path: HDF5 output path.
-        device: "cpu" or "gpu" for abTEM.
-        mp_api_key: Materials Project API key.
-        seed: Random seed.
-        fov_nm: Field of view in nm.
-
-    Returns:
-        Path to generated HDF5 file.
-    """
+    """Generate SrTiO3 world with clustered O vacancies along a grain boundary."""
     if output_path is None:
         output_path = Path("data/simulated/srtio3_clustered.h5")
 
@@ -182,13 +130,13 @@ def generate_srtio3_clustered(
     diff = DIFFICULTY_PARAMS[difficulty]
     cdiff = CLUSTERED_DIFFICULTY[difficulty]
 
-    # --- 1. Get unit cell ---
+
     logger.info("Building SrTiO3 structure...")
     unit_cell = build_srtio3_from_mp(mp_api_key)
 
-    # --- 2. Build supercell ---
+
     fov_angstrom = fov_nm * 10.0
-    z_thickness = 100.0  # 10 nm
+    z_thickness = 100.0
 
     supercell = build_supercell(
         unit_cell,
@@ -198,7 +146,7 @@ def generate_srtio3_clustered(
 
     pristine = supercell.copy()
 
-    # --- 3. Plant clustered O vacancies ---
+
     vacancy_rate = cdiff["vacancy_rate"]
     cluster_fraction = cdiff["cluster_fraction"]
     line_width_frac = cdiff["line_width_frac"]
@@ -215,7 +163,7 @@ def generate_srtio3_clustered(
     )
     logger.info(f"Created {len(vacancy_indices)} O vacancies out of {len(supercell)} atoms")
 
-    # --- 4. Record ground truth ---
+
     ground_truth = record_ground_truth(
         pristine,
         vacancy_indices=vacancy_indices,
@@ -228,7 +176,7 @@ def generate_srtio3_clustered(
     ground_truth.extra["zone_axis"] = "001"
     ground_truth.extra["clustering"] = "grain_boundary"
 
-    # --- 5. Configure simulation ---
+
     config = SimConfig(
         scenario="srtio3_clustered",
         difficulty=difficulty,
@@ -247,7 +195,7 @@ def generate_srtio3_clustered(
         seed=seed,
     )
 
-    # --- 6. Run STEM simulation ---
+
     if shard_id is not None and total_shards is not None:
         stem = str(output_path.with_suffix(''))
         npz_path = Path(f"{stem}_shard{shard_id}.npz")
@@ -265,7 +213,7 @@ def generate_srtio3_clustered(
         image = run_stem_simulation(defected, config)
     logger.info(f"Image shape: {image.shape}")
 
-    # --- 7. Write HDF5 ---
+
     write_world_hdf5(output_path, image, ground_truth, config)
 
     return output_path

@@ -1,10 +1,3 @@
-"""Shared abTEM simulation pipeline utilities for scenario generators.
-
-All scenario generators (SrTiO3, BaTiO3, Si/Ge, GaN, Pt) share this pipeline:
-  MP structure → ASE → supercell → plant defects → record ground truth
-  → frozen phonons → PRISM → Poisson noise → tile → HDF5
-"""
-
 from __future__ import annotations
 
 import logging
@@ -19,61 +12,45 @@ from ase import Atoms
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
 @dataclass
 class SimConfig:
-    """Full simulation configuration for a scenario."""
-    # Identity
+
+
     scenario: str = "unknown"
     difficulty: str = "medium"
 
-    # Electron optics
-    energy_eV: float = 200e3       # 200 keV
-    semiangle_cutoff: float = 21.0  # mrad, convergence semi-angle
-    haadf_inner: float = 68.0      # mrad
-    haadf_outer: float = 200.0     # mrad
 
-    # PRISM
+    energy_eV: float = 200e3
+    semiangle_cutoff: float = 21.0
+    haadf_inner: float = 68.0
+    haadf_outer: float = 200.0
+
+
     interpolation: int = 2
     device: str = "cpu"
 
-    # Potential
-    sampling: float = 0.05         # Angstrom per pixel
-    slice_thickness: float = 1.0   # Angstrom
 
-    # Frozen phonons
+    sampling: float = 0.05
+    slice_thickness: float = 1.0
+
+
     num_phonon_configs: int = 8
     phonon_sigmas: dict[str, float] = field(default_factory=dict)
 
-    # Tiling (HDF5 output)
+
     tile_size_px: int = 128
     overlap_px: int = 4
 
-    # Simulation tiling (for large FOVs that don't fit in GPU memory)
-    sim_tile_nm: float = 7.0  # tile size for PRISM sub-simulations (nm)
-    sim_tile_overlap_nm: float = 1.0  # overlap between sim tiles (nm)
 
-    # Output
+    sim_tile_nm: float = 7.0
+    sim_tile_overlap_nm: float = 1.0
+
+
     seed: int = 42
 
 
-# ---------------------------------------------------------------------------
-# Structure fetching
-# ---------------------------------------------------------------------------
-
 def fetch_mp_structure(mp_id: str, api_key: str | None = None) -> Atoms:
-    """Fetch a structure from Materials Project and convert to ASE Atoms.
-
-    Args:
-        mp_id: Materials Project ID (e.g. "mp-5229").
-        api_key: MP API key. If None, uses MP_API_KEY env var.
-
-    Returns:
-        ASE Atoms object.
-    """
+    """Fetch a structure from Materials Project and convert to ASE Atoms."""
     from mp_api.client import MPRester
     from pymatgen.io.ase import AseAtomsAdaptor
 
@@ -87,22 +64,14 @@ def build_supercell(
     atoms: Atoms,
     target_size_angstrom: tuple[float, float, float],
 ) -> Atoms:
-    """Build an orthorhombic supercell of approximately the target size.
-
-    Args:
-        atoms: Unit cell.
-        target_size_angstrom: (x, y, z) target dimensions in Angstrom.
-
-    Returns:
-        Supercell as ASE Atoms.
-    """
+    """Build an orthorhombic supercell of approximately the target size."""
     import abtem
 
-    # First orthogonalize
+
     atoms = abtem.orthogonalize_cell(atoms)
     cell = atoms.cell.array
 
-    # Compute repetitions needed
+
     reps = []
     for i in range(3):
         length = np.linalg.norm(cell[i])
@@ -115,29 +84,21 @@ def build_supercell(
 
 
 def standardize_for_stem(atoms: Atoms, zone_axis: tuple[int, int, int] = (0, 0, 1)) -> Atoms:
-    """Standardize cell for STEM: beam along z, orthorhombic.
-
-    For [001] zone axis the default orientation is already correct.
-    For [110] zone axis we need to rotate.
-    """
+    """Standardize cell for STEM: beam along z, orthorhombic."""
     import abtem
 
     if zone_axis == (0, 0, 1):
-        # Default: beam along z
+
         return abtem.standardize_cell(atoms)
     elif zone_axis == (1, 1, 0):
-        # Rotate so [110] is along z
+
         from ase.build import cut
-        # cut to get [110] along z: a1=[1,-1,0], a2=[0,0,1], a3=[1,1,0]
+
         rotated = cut(atoms, a=(1, -1, 0), b=(0, 0, 1), c=(1, 1, 0))
         return abtem.standardize_cell(rotated)
     else:
         raise ValueError(f"Unsupported zone axis: {zone_axis}")
 
-
-# ---------------------------------------------------------------------------
-# Defect planting
-# ---------------------------------------------------------------------------
 
 def plant_vacancies(
     atoms: Atoms,
@@ -145,17 +106,7 @@ def plant_vacancies(
     rate: float,
     rng: np.random.Generator,
 ) -> tuple[Atoms, np.ndarray]:
-    """Remove atoms to create vacancies.
-
-    Args:
-        atoms: Input structure.
-        species: Chemical symbol to create vacancies for (e.g. "O").
-        rate: Fraction of atoms of that species to remove.
-        rng: Random number generator.
-
-    Returns:
-        (modified_atoms, vacancy_indices) — indices are into the ORIGINAL atoms.
-    """
+    """Remove atoms to create vacancies."""
     symbols = np.array(atoms.get_chemical_symbols())
     species_mask = symbols == species
     species_indices = np.where(species_mask)[0]
@@ -163,7 +114,7 @@ def plant_vacancies(
     n_vacancies = max(1, int(len(species_indices) * rate))
     vacancy_indices = rng.choice(species_indices, size=n_vacancies, replace=False)
 
-    # Remove atoms (reverse sort to avoid index shifting)
+
     keep_mask = np.ones(len(atoms), dtype=bool)
     keep_mask[vacancy_indices] = False
 
@@ -179,23 +130,7 @@ def plant_vacancies_weighted(
     rng: np.random.Generator,
     cluster_fraction: float = 0.7,
 ) -> tuple[Atoms, np.ndarray]:
-    """Remove atoms to create vacancies, biased by per-atom weights.
-
-    Splits total vacancies into clustered (sampled proportional to weights)
-    and background (uniform from remaining atoms).
-
-    Args:
-        atoms: Input structure.
-        species: Chemical symbol to create vacancies for (e.g. "O").
-        rate: Fraction of atoms of that species to remove.
-        weights: Per-species-atom array (higher = more likely to be a vacancy).
-                 Must have length equal to the number of atoms of `species`.
-        rng: Random number generator.
-        cluster_fraction: Fraction of vacancies drawn from weighted distribution.
-
-    Returns:
-        (modified_atoms, vacancy_indices) — indices are into the ORIGINAL atoms.
-    """
+    """Remove atoms to create vacancies, biased by per-atom weights."""
     symbols = np.array(atoms.get_chemical_symbols())
     species_mask = symbols == species
     species_indices = np.where(species_mask)[0]
@@ -210,7 +145,7 @@ def plant_vacancies_weighted(
     n_clustered = int(n_vacancies * cluster_fraction)
     n_background = n_vacancies - n_clustered
 
-    # --- Clustered vacancies: sample proportional to weights ---
+
     w = np.asarray(weights, dtype=np.float64)
     w_sum = w.sum()
     if w_sum > 0:
@@ -221,7 +156,7 @@ def plant_vacancies_weighted(
     clustered_local = rng.choice(len(species_indices), size=n_clustered, replace=False, p=prob)
     chosen_set = set(clustered_local.tolist())
 
-    # --- Background vacancies: uniform from remainder ---
+
     remaining_local = np.array([i for i in range(len(species_indices)) if i not in chosen_set])
     if n_background > 0 and len(remaining_local) > 0:
         n_background = min(n_background, len(remaining_local))
@@ -232,7 +167,7 @@ def plant_vacancies_weighted(
 
     vacancy_indices = species_indices[all_local]
 
-    # Remove atoms
+
     keep_mask = np.ones(len(atoms), dtype=bool)
     keep_mask[vacancy_indices] = False
     modified = atoms[keep_mask]
@@ -247,11 +182,7 @@ def plant_substitutions(
     rate: float,
     rng: np.random.Generator,
 ) -> tuple[Atoms, np.ndarray]:
-    """Replace atoms to create substitutional defects.
-
-    Returns:
-        (modified_atoms, substitution_indices) — indices into ORIGINAL atoms.
-    """
+    """Replace atoms to create substitutional defects."""
     symbols = np.array(atoms.get_chemical_symbols())
     species_mask = symbols == original_species
     species_indices = np.where(species_mask)[0]
@@ -268,20 +199,16 @@ def plant_substitutions(
     return modified, sub_indices
 
 
-# ---------------------------------------------------------------------------
-# Ground truth recording
-# ---------------------------------------------------------------------------
-
 @dataclass
 class GroundTruth:
-    """Ground truth for a simulated world."""
-    # All positions in nm (x, y) — projected along beam direction
-    atom_positions_nm: np.ndarray     # (N, 2) all atoms in pristine structure
-    atom_types: np.ndarray            # (N,) int — 0=normal, 1=vacancy, 2=substitution
-    atom_species: list[str]           # (N,) element symbols
-    defect_mask: np.ndarray           # (N,) bool
-    defect_types: list[str]           # (N,) "pristine"/"vacancy"/"substitution"
-    phase_map: np.ndarray | None = None  # (H, W) int phase labels
+
+
+    atom_positions_nm: np.ndarray
+    atom_types: np.ndarray
+    atom_species: list[str]
+    defect_mask: np.ndarray
+    defect_types: list[str]
+    phase_map: np.ndarray | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -291,13 +218,10 @@ def record_ground_truth(
     substitution_indices: np.ndarray | None = None,
     pixel_size_nm: float = 0.005,
 ) -> GroundTruth:
-    """Record ground truth from pristine structure and defect indices.
-
-    Projects atom positions along z (beam direction) to get 2D positions.
-    """
+    """Record ground truth from pristine structure and defect indices."""
     positions_angstrom = pristine_atoms.get_positions()
-    # Project to xy plane, convert to nm
-    positions_nm = positions_angstrom[:, :2] / 10.0  # Angstrom -> nm
+
+    positions_nm = positions_angstrom[:, :2] / 10.0
 
     n_atoms = len(pristine_atoms)
     atom_types = np.zeros(n_atoms, dtype=np.int32)
@@ -329,18 +253,11 @@ def record_ground_truth(
     )
 
 
-# ---------------------------------------------------------------------------
-# abTEM simulation
-# ---------------------------------------------------------------------------
-
 def _run_single_tile_simulation(
     atoms: Atoms,
     config: SimConfig,
 ) -> np.ndarray:
-    """Run PRISM STEM-HAADF on a single (small) structure tile.
-
-    The structure must be small enough that the S-matrix fits in memory.
-    """
+    """Run PRISM STEM-HAADF on a single (small) structure tile."""
     import abtem
 
     frozen = abtem.FrozenPhonons(
@@ -470,10 +387,7 @@ def _run_tile_range(
     start_tile: int,
     end_tile: int,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Simulate tiles [start_tile, end_tile) and return unnormalized (image, weights).
-
-    Tiles are indexed 0-based in row-major order: idx = ti * n_tiles_y + tj.
-    """
+    """Simulate tiles [start_tile, end_tile) and return unnormalized (image, weights)."""
     image = np.zeros((grid['full_px_y'], grid['full_px_x']), dtype=np.float64)
     weights = np.zeros((grid['full_px_y'], grid['full_px_x']), dtype=np.float64)
 
@@ -500,7 +414,7 @@ def _run_tile_range(
             px_y0 = int(round(y0 / grid['output_sampling']))
             th, tw = tile_image.shape
 
-            # Build blend weights for this tile
+
             w = np.ones_like(tile_image, dtype=np.float64)
             olap_w = min(grid['overlap_px'], tw // 3) if grid['overlap_px'] > 0 else 0
             olap_h = min(grid['overlap_px'], th // 3) if grid['overlap_px'] > 0 else 0
@@ -517,7 +431,7 @@ def _run_tile_range(
                 if tj < grid['n_tiles_y'] - 1:
                     w[-olap_h:, :] *= ramp_h[::-1, np.newaxis]
 
-            # Accumulate
+
             py_end = min(px_y0 + th, grid['full_px_y'])
             px_end = min(px_x0 + tw, grid['full_px_x'])
             sh = py_end - px_y0
@@ -534,22 +448,10 @@ def run_stem_simulation(
     atoms: Atoms,
     config: SimConfig,
 ) -> np.ndarray:
-    """Run PRISM STEM-HAADF simulation, tiling if the structure is too large.
-
-    For structures larger than ``config.sim_tile_nm``, the XY plane is
-    divided into overlapping tiles, each simulated independently, then
-    blended together with linearly-weighted overlap.
-
-    Args:
-        atoms: Structure (with or without frozen phonons already applied).
-        config: Simulation configuration.
-
-    Returns:
-        HAADF image as (H, W) float32 numpy array.
-    """
+    """Run PRISM STEM-HAADF simulation, tiling if the structure is too large."""
     cell = atoms.cell.array
-    # Use vector norms — permuted cells (e.g. GaN [11-20]) are not diagonal
-    extent_x = float(np.linalg.norm(cell[0]))  # Angstrom
+
+    extent_x = float(np.linalg.norm(cell[0]))
     extent_y = float(np.linalg.norm(cell[1]))
 
     tile_ang = config.sim_tile_nm * 10.0
@@ -561,7 +463,7 @@ def run_stem_simulation(
         logger.info("Structure fits in single tile, running directly...")
         return _run_single_tile_simulation(atoms, config)
 
-    # --- Tiled simulation ---
+
     grid = _compute_tiled_grid_params(atoms, config)
     logger.info(
         f"Tiling simulation: {grid['n_tiles_x']}x{grid['n_tiles_y']} = "
@@ -573,7 +475,7 @@ def run_stem_simulation(
 
     image, weights = _run_tile_range(atoms, config, grid, 0, grid['total_tiles'])
 
-    # Normalize by weights
+
     mask = weights > 0
     image[mask] /= weights[mask]
 
@@ -587,19 +489,7 @@ def run_stem_simulation_shard(
     total_shards: int,
     output_path: Path,
 ) -> None:
-    """Run a shard of the tiled STEM simulation, saving partial results.
-
-    Computes tiles [start, end) where the range is determined by evenly
-    dividing total_tiles across total_shards.  Saves unnormalized
-    (image, weights) arrays to a .npz file for later merging.
-
-    Args:
-        atoms: Structure to simulate.
-        config: Simulation configuration.
-        shard_id: 0-based shard index.
-        total_shards: Total number of shards.
-        output_path: Path to write .npz file.
-    """
+    """Run a shard of the tiled STEM simulation, saving partial results."""
     grid = _compute_tiled_grid_params(atoms, config)
     total_tiles = grid['total_tiles']
 
@@ -620,17 +510,7 @@ def run_stem_simulation_shard(
 
 
 def merge_simulation_shards(shard_paths: list[Path | str]) -> np.ndarray:
-    """Load shard .npz files, sum (image, weights), normalize, return image.
-
-    Each shard file must contain 'image' and 'weights' arrays of the same
-    shape, produced by run_stem_simulation_shard().
-
-    Args:
-        shard_paths: Paths to shard .npz files.
-
-    Returns:
-        Normalized HAADF image as (H, W) float32 array.
-    """
+    """Load shard .npz files, sum (image, weights), normalize, return image."""
     image = None
     weights = None
 
@@ -666,10 +546,6 @@ def add_shard_args(parser) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# HDF5 writing
-# ---------------------------------------------------------------------------
-
 def write_world_hdf5(
     output_path: Path,
     image: np.ndarray,
@@ -677,23 +553,15 @@ def write_world_hdf5(
     config: SimConfig,
     pixel_size_nm: float | None = None,
 ) -> None:
-    """Write a simulated world to HDF5 in STEMGym format.
-
-    Args:
-        output_path: Path to write HDF5 file.
-        image: (H, W) HAADF image.
-        ground_truth: Ground truth data.
-        config: Simulation config.
-        pixel_size_nm: Override pixel size. If None, computed from config.sampling.
-    """
+    """Write a simulated world to HDF5 in STEMGym format."""
     from scipy.ndimage import zoom as scipy_zoom
 
     if pixel_size_nm is None:
-        # Use PRISM output pixel size (sampling * interpolation)
+
         interpolation = config.interpolation
         if config.device == "gpu":
             interpolation = max(interpolation, 4)
-        pixel_size_nm = (config.sampling * interpolation) / 10.0  # Angstrom -> nm
+        pixel_size_nm = (config.sampling * interpolation) / 10.0
 
     h, w = image.shape
     tile_size = config.tile_size_px
@@ -706,25 +574,25 @@ def write_world_hdf5(
     fov_h = h * pixel_size_nm
     fov_w = w * pixel_size_nm
 
-    # Normalize image to [0, 1]
+
     img_min, img_max = image.min(), image.max()
     if img_max > img_min:
         image_norm = (image - img_min) / (img_max - img_min)
     else:
         image_norm = image.copy()
 
-    # Overview: downsample by 4x
+
     scale = min(1.0, 256.0 / max(h, w))
     overview = scipy_zoom(image_norm, scale, order=1).astype(np.float32)
 
-    # Valid region: entire image
+
     valid_region = np.ones((h, w), dtype=bool)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Writing HDF5 to {output_path}...")
     with h5py.File(output_path, "w") as f:
-        # Metadata
+
         meta = f.create_group("metadata")
         meta.attrs["pixel_size_nm"] = pixel_size_nm
         meta.attrs["tile_size_px"] = tile_size
@@ -735,13 +603,13 @@ def write_world_hdf5(
         meta.attrs["scenario"] = config.scenario
         meta.attrs["difficulty"] = config.difficulty
 
-        # Overview
+
         f.create_dataset("overview", data=overview, dtype=np.float32)
 
-        # Valid region
+
         f.create_dataset("valid_region", data=valid_region, dtype=bool)
 
-        # Tiles
+
         tiles_group = f.create_group("tiles")
         for r in range(grid_h):
             for c in range(grid_w):
@@ -750,7 +618,7 @@ def write_world_hdf5(
                 y1 = min(y0 + tile_size, h)
                 x1 = min(x0 + tile_size, w)
                 tile = image_norm[y0:y1, x0:x1]
-                # Pad if needed (edge tiles)
+
                 if tile.shape != (tile_size, tile_size):
                     padded = np.zeros((tile_size, tile_size), dtype=np.float32)
                     padded[:tile.shape[0], :tile.shape[1]] = tile
@@ -759,7 +627,7 @@ def write_world_hdf5(
                     f"{r}_{c}", data=tile, dtype=np.float32, chunks=True,
                 )
 
-        # Ground truth
+
         gt = f.create_group("ground_truth")
         gt.create_dataset("atom_positions", data=ground_truth.atom_positions_nm)
         gt.create_dataset("atom_types", data=ground_truth.atom_types)
@@ -789,10 +657,6 @@ def write_world_hdf5(
         f"{n_atoms} atoms, {n_defects} defects"
     )
 
-
-# ---------------------------------------------------------------------------
-# Difficulty presets
-# ---------------------------------------------------------------------------
 
 DIFFICULTY_PARAMS = {
     "easy": {"vacancy_rate": 0.05, "num_phonon_configs": 4, "noise_dose": 1e4},

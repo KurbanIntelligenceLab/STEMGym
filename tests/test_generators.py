@@ -1,10 +1,3 @@
-"""Integration tests for scenario generators.
-
-These tests verify that the abTEM simulation pipeline works end-to-end
-with small supercells. They do NOT test physical accuracy (that requires
-visual inspection of larger simulations).
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,7 +25,6 @@ from stem_gym.envs.world import World
 from stem_gym.envs.stem_env import STEMEnv, ActionType
 
 
-# Mark all tests in this module as slow (require abTEM)
 pytestmark = pytest.mark.slow
 
 
@@ -84,7 +76,7 @@ class TestSrTiO3Generator:
     def test_unit_cell(self):
         from generate_srtio3_clustered import build_srtio3_unit_cell
         uc = build_srtio3_unit_cell()
-        assert len(uc) == 5  # Sr + Ti + 3 O
+        assert len(uc) == 5
         assert set(uc.get_chemical_symbols()) == {"Sr", "Ti", "O"}
 
     def test_pipeline(self, tmp_path):
@@ -122,7 +114,7 @@ class TestBaTiO3Generator:
         tetra = build_batio3_cell("tetragonal")
         assert len(cubic) == 5
         assert len(tetra) == 5
-        # Tetragonal c > cubic a
+
         assert tetra.cell[2, 2] > cubic.cell[2, 2]
 
     def test_phase_map(self):
@@ -131,7 +123,7 @@ class TestBaTiO3Generator:
         pm = make_phase_boundary_mask((100, 100), n_boundaries=1, waviness=0.0, rng=rng)
         assert pm.shape == (100, 100)
         assert set(np.unique(pm)) == {0, 1}
-        # Both phases present
+
         assert np.sum(pm == 0) > 0
         assert np.sum(pm == 1) > 0
 
@@ -210,9 +202,9 @@ class TestSiGeGenerator:
 
 
 class TestClusteredUtilities:
-    """Tests for plant_vacancies_weighted (no abTEM required)."""
 
-    pytestmark = []  # Override module-level slow marker
+
+    pytestmark = []
 
     def test_correct_vacancy_count(self):
         from ase.build import bulk
@@ -233,7 +225,7 @@ class TestClusteredUtilities:
         si = bulk("Si", "diamond", a=5.431) * (8, 8, 8)
         n_si = sum(1 for s in si.get_chemical_symbols() if s == "Si")
 
-        # Create weights: first half gets weight 10, second half gets weight 0.01
+
         weights = np.ones(n_si)
         half = n_si // 2
         weights[:half] = 10.0
@@ -247,13 +239,12 @@ class TestClusteredUtilities:
             si, "Si", rate=0.05, weights=weights, rng=rng, cluster_fraction=0.8,
         )
 
-        # Map vacancy indices back to local Si indices
+
         si_idx_set = set(si_indices.tolist())
         si_local = {idx: local for local, idx in enumerate(si_indices)}
         n_first_half = sum(1 for idx in vac_idx if si_local[idx] < half)
 
-        # With 80% cluster fraction and 10:0.01 weight ratio,
-        # vast majority of vacancies should be in the first half
+
         assert n_first_half > len(vac_idx) * 0.5, (
             f"Expected >50% of vacancies in high-weight half, got "
             f"{n_first_half}/{len(vac_idx)}"
@@ -286,9 +277,9 @@ class TestClusteredUtilities:
 
 
 class TestSrTiO3Clustered:
-    """Tests for the SrTiO3 clustered-defect generator."""
 
-    pytestmark = []  # Override module-level slow marker for non-pipeline tests
+
+    pytestmark = []
 
     def test_grain_boundary_weights(self):
         from generate_srtio3_clustered import build_srtio3_unit_cell
@@ -320,7 +311,7 @@ class TestSrTiO3Clustered:
             sc, "O", rate=0.03, weights=weights, rng=rng, cluster_fraction=0.70,
         )
 
-        # Compute distance of each vacancy to the grain boundary
+
         positions = sc.get_positions()
         cell_x = sc.cell[0, 0]
         cell_y = sc.cell[1, 1]
@@ -337,8 +328,8 @@ class TestSrTiO3Clustered:
         distances = np.abs(dp[:, 0] * line_dir[1] - dp[:, 1] * line_dir[0])
 
         frac_within_sigma = np.mean(distances < sigma)
-        # With 70% cluster_fraction and Gaussian weights, we expect a clear
-        # bias towards the boundary. Use a lenient threshold for statistical test.
+
+
         assert frac_within_sigma > 0.25, (
             f"Expected >25% of vacancies within 1σ of boundary, got "
             f"{frac_within_sigma:.1%}"
@@ -371,7 +362,7 @@ class TestSrTiO3Clustered:
 
 
 class TestBaTiO3Interface:
-    """Tests for the BaTiO3 interface generator."""
+
 
     pytestmark = []
 
@@ -407,7 +398,7 @@ class TestBaTiO3Interface:
             rng=rng, cluster_fraction=0.70,
         )
 
-        # Compute mean distance-to-boundary for vacancies vs all O atoms
+
         boundary_mask = np.zeros_like(phase_map, dtype=bool)
         boundary_mask[:-1, :] |= phase_map[:-1, :] != phase_map[1:, :]
         boundary_mask[:, :-1] |= phase_map[:, :-1] != phase_map[:, 1:]
@@ -461,7 +452,7 @@ class TestBaTiO3Interface:
 
 
 class TestSiGeGradientClustered:
-    """Tests for the SiGe gradient-clustered generator."""
+
 
     pytestmark = []
 
@@ -480,7 +471,7 @@ class TestSiGeGradientClustered:
             quadrant_sigma_frac=0.15, rng=rng,
         )
 
-        # Check what fraction of Ge is in the target quadrant
+
         positions = modified.get_positions()
         symbols = modified.get_chemical_symbols()
         cell_x = modified.cell[0, 0]
@@ -493,14 +484,14 @@ class TestSiGeGradientClustered:
                 n_ge_total += 1
                 fx = pos[0] / cell_x
                 fy = pos[1] / cell_y
-                # "Target quadrant" = within 0.25 of center in both dims
+
                 if (abs(fx - QUADRANT_CENTER[0]) < 0.25 and
                         abs(fy - QUADRANT_CENTER[1]) < 0.25):
                     n_ge_quadrant += 1
 
         if n_ge_total > 0:
             frac_in_quadrant = n_ge_quadrant / n_ge_total
-            # With cluster_fraction=0.70 and Gaussian, expect clear concentration
+
             assert frac_in_quadrant > 0.30, (
                 f"Expected >30% of Ge in target quadrant, got "
                 f"{frac_in_quadrant:.1%} ({n_ge_quadrant}/{n_ge_total})"
@@ -511,9 +502,9 @@ class TestSiGeGradientClustered:
         pm = make_clustered_phase_map((200, 200), quadrant_sigma_frac=0.15)
         assert pm.shape == (200, 200)
         assert set(np.unique(pm)).issubset({0, 1, 2})
-        # All three phases should be present
+
         assert np.sum(pm == 0) > 0
-        assert np.sum(pm == 2) > 0  # high-Ge core
+        assert np.sum(pm == 2) > 0
 
     def test_gradient_output_shape(self):
         from generate_sige_gradient_clustered import build_si_supercell_110
@@ -525,7 +516,7 @@ class TestSiGeGradientClustered:
             sc, ge_max=0.5, cluster_fraction=0.70,
             quadrant_sigma_frac=0.15, rng=rng,
         )
-        assert len(modified) == len(sc)  # substitutions don't remove atoms
+        assert len(modified) == len(sc)
         assert ge_frac_2d.shape == (50, 50)
         assert ge_frac_2d.min() >= 0.0
         assert ge_frac_2d.max() <= 1.0
@@ -562,14 +553,14 @@ class TestSiGeGradientClustered:
 
 
 class TestGaNGenerator:
-    """Tests for the GaN InGaN generator."""
 
-    pytestmark = []  # Override module-level slow marker for non-pipeline tests
+
+    pytestmark = []
 
     def test_unit_cell(self):
         from generate_gan import build_gan_unit_cell
         uc = build_gan_unit_cell()
-        assert len(uc) == 8  # 4 Ga + 4 N (orthorhombic wurtzite cell)
+        assert len(uc) == 8
         assert set(uc.get_chemical_symbols()) == {"Ga", "N"}
 
     def test_in_substitution(self):
@@ -589,7 +580,7 @@ class TestGaNGenerator:
         pm = make_gan_phase_map((200, 200), qw_center_frac=0.65, qw_width_frac=0.10)
         assert pm.shape == (200, 200)
         assert set(np.unique(pm)) == {0, 1, 2}
-        # All three phases should be present
+
         assert np.sum(pm == 0) > 0
         assert np.sum(pm == 1) > 0
         assert np.sum(pm == 2) > 0
@@ -623,9 +614,9 @@ class TestGaNGenerator:
 
 
 class TestPtNanoparticlesGenerator:
-    """Tests for the Pt nanoparticle generator."""
 
-    pytestmark = []  # Override module-level slow marker for non-pipeline tests
+
+    pytestmark = []
 
     def test_wulff_particle(self):
         from generate_pt_nanoparticles import make_wulff_particle
@@ -660,7 +651,7 @@ class TestPtNanoparticlesGenerator:
         )
 
         rng = np.random.default_rng(42)
-        fov = 200.0  # 20 nm in Angstrom
+        fov = 200.0
         support = make_amorphous_carbon(fov, fov, 30.0, 2.0, rng)
 
         pdiff = dict(PT_DIFFICULTY["easy"])
@@ -680,11 +671,11 @@ class TestPtNanoparticlesGenerator:
 
 
 class TestEnvIntegration:
-    """Test that generated worlds work with STEMEnv."""
+
 
     @pytest.fixture(params=["srtio3", "batio3", "sige"])
     def world_path(self, request, tmp_path):
-        # Generate independent fixtures instead of depending on files left by other tests.
+
         material = request.param
         if material == "srtio3":
             from generate_srtio3_clustered import build_srtio3_unit_cell

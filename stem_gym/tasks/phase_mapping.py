@@ -1,5 +1,3 @@
-"""Phase Mapping task: IoU score for phase identification."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -10,10 +8,7 @@ from stem_gym.tasks import Task
 
 
 class PhaseMappingTask(Task):
-    """Score agent's phase map against ground truth.
 
-    Primary metric: macro-averaged IoU across phases.
-    """
 
     @property
     def name(self) -> str:
@@ -31,14 +26,14 @@ class PhaseMappingTask(Task):
         gt_map = np.asarray(gt_map)
         pred_map = np.asarray(pred_map)
 
-        # Resize pred to match gt if needed
+
         if pred_map.shape != gt_map.shape:
             from scipy.ndimage import zoom
             scale_h = gt_map.shape[0] / pred_map.shape[0]
             scale_w = gt_map.shape[1] / pred_map.shape[1]
             pred_map = zoom(pred_map, (scale_h, scale_w), order=0).astype(int)
 
-        # Compute per-phase IoU
+
         all_phases = set(np.unique(gt_map)) | set(np.unique(pred_map))
         ious = []
 
