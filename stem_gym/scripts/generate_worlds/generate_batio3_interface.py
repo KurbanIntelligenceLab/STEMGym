@@ -1,24 +1,3 @@
-#!/usr/bin/env python3
-"""Generate BaTiO3 interface scenario: phase boundaries + clustered O vacancies.
-
-Material: BaTiO3 (mp-5986), [001] zone axis, ~100nm FOV
-Defects: Cubic/tetragonal phase boundaries AND O vacancies concentrated
-         near the boundaries (as seen in real ferroelectric ceramics)
-Task: Defect Census + Phase Mapping (dual-objective)
-
-Extends the uniform BaTiO3 generator by adding vacancy accumulation near
-phase boundaries.  After building the composite structure and phase map,
-we compute a distance-to-nearest-boundary field with
-scipy.ndimage.distance_transform_edt.  O atoms close to boundaries get
-higher vacancy probability via plant_vacancies_weighted.
-
-Usage:
-    uv run --locked --extra sim python stem_gym/scripts/generate_worlds/generate_batio3_interface.py [--difficulty easy|medium|hard]
-                                                      [--output data/simulated/batio3_interface.h5]
-                                                      [--device cpu|gpu]
-                                                      [--seed 42]
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -47,14 +26,13 @@ from sim_utils import (
     DIFFICULTY_PARAMS,
 )
 
-# BaTiO3 lattice parameters
-# Cubic phase: a = 4.009 Å (above Curie temperature)
+
 BTO_CUBIC_A = 4.009
-# Tetragonal phase: a = 3.994 Å, c = 4.038 Å (room temperature)
+
 BTO_TETRA_A = 3.994
 BTO_TETRA_C = 4.038
 
-# Debye-Waller factors for BaTiO3
+
 BTO_PHONON_SIGMAS = {
     "Ba": 0.080,
     "Ti": 0.080,
@@ -63,14 +41,7 @@ BTO_PHONON_SIGMAS = {
 
 
 def build_batio3_cell(phase: str = "cubic") -> Atoms:
-    """Build BaTiO3 perovskite unit cell.
-
-    Args:
-        phase: "cubic" or "tetragonal".
-
-    Cubic: a = b = c = 4.009 Å
-    Tetragonal: a = b = 3.994 Å, c = 4.038 Å, Ti displaced along c
-    """
+    """Build BaTiO3 perovskite unit cell."""
     if phase == "cubic":
         a = BTO_CUBIC_A
         atoms = Atoms(
@@ -87,7 +58,7 @@ def build_batio3_cell(phase: str = "cubic") -> Atoms:
         )
     elif phase == "tetragonal":
         a, c = BTO_TETRA_A, BTO_TETRA_C
-        # Ti is displaced ~0.05 Å along c in tetragonal phase
+
         ti_disp = 0.05
         atoms = Atoms(
             symbols=["Ba", "Ti", "O", "O", "O"],
@@ -112,36 +83,26 @@ def make_phase_boundary_mask(
     waviness: float = 0.0,
     rng: np.random.Generator | None = None,
 ) -> np.ndarray:
-    """Create a phase map with boundaries between cubic (0) and tetragonal (1).
-
-    Args:
-        shape_px: (H, W) image shape in pixels.
-        n_boundaries: Number of phase boundaries.
-        waviness: Amplitude of boundary waviness as fraction of width.
-        rng: Random number generator.
-
-    Returns:
-        (H, W) int32 array: 0 = cubic, 1 = tetragonal.
-    """
+    """Create a phase map with boundaries between cubic (0) and tetragonal (1)."""
     if rng is None:
         rng = np.random.default_rng(42)
 
     h, w = shape_px
     phase_map = np.zeros(shape_px, dtype=np.int32)
 
-    # Evenly space boundaries
+
     boundary_positions = np.linspace(0, w, n_boundaries + 2)[1:-1]
 
     for i, bx in enumerate(boundary_positions):
-        # Create wavy boundary
+
         if waviness > 0:
-            # Sinusoidal + random perturbation
+
             freq = rng.uniform(1, 4)
             phase_offset = rng.uniform(0, 2 * np.pi)
             wave = waviness * w * np.sin(
                 2 * np.pi * freq * np.arange(h) / h + phase_offset
             )
-            # Add some random roughness
+
             roughness = waviness * w * 0.3 * rng.normal(size=h)
             from scipy.ndimage import gaussian_filter1d
             roughness = gaussian_filter1d(roughness, sigma=h * 0.05)
@@ -151,7 +112,7 @@ def make_phase_boundary_mask(
 
         for row in range(h):
             col_boundary = int(np.clip(boundary[row], 0, w - 1))
-            # Alternate phases at each boundary
+
             if i % 2 == 0:
                 phase_map[row, col_boundary:] = 1
             else:
@@ -166,21 +127,14 @@ def build_composite_structure(
     phase_map: np.ndarray,
     sampling_angstrom: float = 0.5,
 ) -> tuple[Atoms, np.ndarray]:
-    """Build a composite cubic+tetragonal BaTiO3 structure.
-
-    Places cubic or tetragonal unit cells based on the phase map.
-    Returns the full atomic structure and per-atom phase labels.
-
-    For efficiency, we build separate supercells for each phase region
-    and merge them.
-    """
+    """Build a composite cubic+tetragonal BaTiO3 structure."""
     import abtem
 
-    # Build supercells for both phases
+
     cubic_cell = build_batio3_cell("cubic")
     tetra_cell = build_batio3_cell("tetragonal")
 
-    # Build full cubic supercell as base
+
     cubic_super = build_supercell(
         cubic_cell,
         target_size_angstrom=(fov_angstrom, fov_angstrom, z_thickness),
@@ -190,9 +144,7 @@ def build_composite_structure(
         target_size_angstrom=(fov_angstrom, fov_angstrom, z_thickness),
     )
 
-    # For a first-order approximation: use cubic everywhere but modify
-    # atom positions in tetragonal regions to match tetragonal cell.
-    # This gives physically correct column positions.
+
     composite = cubic_super.copy()
     cell_x = composite.cell[0, 0]
     cell_y = composite.cell[1, 1]
@@ -202,13 +154,13 @@ def build_composite_structure(
     atom_phases = np.zeros(len(composite), dtype=np.int32)
 
     for i, pos in enumerate(positions):
-        # Map atom position to phase map pixel
+
         px = int(pos[0] / cell_x * map_w) % map_w
         py = int(pos[1] / cell_y * map_h) % map_h
 
         if phase_map[py, px] == 1:
             atom_phases[i] = 1
-            # Apply tetragonal distortion: slightly compress a,b and stretch c
+
             scale_ab = BTO_TETRA_A / BTO_CUBIC_A
             scale_c = BTO_TETRA_C / BTO_CUBIC_A
             positions[i, 0] *= scale_ab
@@ -219,7 +171,7 @@ def build_composite_structure(
 
     return composite, atom_phases
 
-# Difficulty params for BaTiO3 interface scenario
+
 INTERFACE_DIFFICULTY = {
     "easy": {
         "vacancy_rate": 0.04,
@@ -251,33 +203,17 @@ def compute_boundary_distance_weights(
     boundary_sigma_px: float,
     sampling_angstrom: float = 0.05,
 ) -> np.ndarray:
-    """Compute per-O-atom weights from distance to nearest phase boundary.
+    """Compute per-O-atom weights from distance to nearest phase boundary."""
 
-    Uses scipy.ndimage.distance_transform_edt on the phase boundary map
-    to get a pixel-level distance field.  Each O atom's xy position is
-    mapped to the distance field and converted to a Gaussian weight.
-
-    Args:
-        atoms: Structure containing O atoms.
-        phase_map: (H, W) int32 phase map (0=cubic, 1=tetragonal).
-        boundary_sigma_px: Gaussian sigma in pixels.
-        sampling_angstrom: Pixel size in Angstrom.
-
-    Returns:
-        weights array of length == number of O atoms.
-    """
-    # Find boundary pixels: where neighbouring pixels differ
     boundary_mask = np.zeros_like(phase_map, dtype=bool)
     boundary_mask[:-1, :] |= phase_map[:-1, :] != phase_map[1:, :]
     boundary_mask[:, :-1] |= phase_map[:, :-1] != phase_map[:, 1:]
 
-    # Distance from every pixel to nearest boundary pixel
-    # distance_transform_edt computes distance from 0-valued pixels
-    # So invert: boundary=0, rest=1
+
     dist_input = (~boundary_mask).astype(np.float64)
     dist_field = distance_transform_edt(dist_input)
 
-    # Map each O atom to the distance field
+
     positions = atoms.get_positions()
     symbols = np.array(atoms.get_chemical_symbols())
     o_mask = symbols == "O"
@@ -287,13 +223,13 @@ def compute_boundary_distance_weights(
     cell_y = atoms.cell[1, 1]
     map_h, map_w = phase_map.shape
 
-    # Atom position -> pixel coordinate
+
     px_x = (o_positions[:, 0] / cell_x * map_w).astype(int) % map_w
     px_y = (o_positions[:, 1] / cell_y * map_h).astype(int) % map_h
 
     distances_px = dist_field[px_y, px_x]
 
-    # Gaussian weights: closer to boundary = higher weight
+
     weights = np.exp(-distances_px**2 / (2.0 * boundary_sigma_px**2))
     return weights
 
@@ -308,18 +244,7 @@ def generate_batio3_interface(
     total_shards: int | None = None,
     merge_shards: int | None = None,
 ) -> Path:
-    """Generate BaTiO3 world with phase boundaries and clustered O vacancies.
-
-    Args:
-        difficulty: "easy", "medium", or "hard".
-        output_path: HDF5 output path.
-        device: "cpu" or "gpu" for abTEM.
-        seed: Random seed.
-        fov_nm: Field of view in nm.
-
-    Returns:
-        Path to generated HDF5 file.
-    """
+    """Generate BaTiO3 world with phase boundaries and clustered O vacancies."""
     if output_path is None:
         output_path = Path("data/simulated/batio3_interface.h5")
 
@@ -329,9 +254,9 @@ def generate_batio3_interface(
 
     fov_angstrom = fov_nm * 10.0
     z_thickness = 100.0
-    sampling = 0.05  # Angstrom/pixel
+    sampling = 0.05
 
-    # --- 1. Create phase boundary map ---
+
     img_size = int(fov_angstrom / sampling)
     logger.info(f"Expected image size: ~{img_size}x{img_size} pixels")
 
@@ -346,7 +271,7 @@ def generate_batio3_interface(
         f"{np.sum(phase_map == 1)} tetragonal pixels"
     )
 
-    # --- 2. Build composite structure ---
+
     logger.info("Building composite cubic/tetragonal structure...")
     composite, atom_phases = build_composite_structure(
         fov_angstrom, z_thickness, phase_map, sampling,
@@ -355,7 +280,7 @@ def generate_batio3_interface(
 
     pristine = composite.copy()
 
-    # --- 3. Plant clustered O vacancies near boundaries ---
+
     vacancy_rate = idiff["vacancy_rate"]
     cluster_fraction = idiff["cluster_fraction"]
     boundary_sigma_px = idiff["boundary_sigma_px"]
@@ -374,7 +299,7 @@ def generate_batio3_interface(
     )
     logger.info(f"Created {len(vacancy_indices)} O vacancies")
 
-    # --- 4. Record ground truth ---
+
     gt = record_ground_truth(
         pristine,
         vacancy_indices=vacancy_indices,
@@ -389,7 +314,7 @@ def generate_batio3_interface(
     gt.extra["boundary_sigma_px"] = boundary_sigma_px
     gt.extra["clustering"] = "boundary_proximity"
 
-    # --- 5. Configure simulation ---
+
     config = SimConfig(
         scenario="batio3_interface",
         difficulty=difficulty,
@@ -408,7 +333,7 @@ def generate_batio3_interface(
         seed=seed,
     )
 
-    # --- 6. Run STEM simulation ---
+
     if shard_id is not None and total_shards is not None:
         stem = str(output_path.with_suffix(''))
         npz_path = Path(f"{stem}_shard{shard_id}.npz")
@@ -426,7 +351,7 @@ def generate_batio3_interface(
         image = run_stem_simulation(defected, config)
     logger.info(f"Image shape: {image.shape}")
 
-    # --- 7. Resize phase map to match actual image ---
+
     from scipy.ndimage import zoom as scipy_zoom
     if phase_map.shape != image.shape:
         scale_h = image.shape[0] / phase_map.shape[0]
@@ -435,7 +360,7 @@ def generate_batio3_interface(
             phase_map, (scale_h, scale_w), order=0,
         ).astype(np.int32)
 
-    # --- 8. Write HDF5 ---
+
     write_world_hdf5(output_path, image, gt, config)
 
     return output_path

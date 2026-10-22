@@ -1,5 +1,3 @@
-"""Tests for the Analyst ensemble: models, training, and evaluation."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,8 +19,6 @@ from stem_gym.agents.simple_analyst import AnalysisResult
 
 TEST_WORLD = Path(__file__).parent.parent / "data" / "simulated" / "test_world.h5"
 
-
-# ---- Model shape tests ----
 
 class TestAtomFinderUNet:
     def test_forward_shape(self):
@@ -61,7 +57,7 @@ class TestAtomFinderEnsemble:
         ensemble = AtomFinderEnsemble(n_members=3, base_channels=16)
         x = torch.randn(1, 1, 128, 128)
         mean, std = ensemble(x)
-        # With random init, std should be non-zero somewhere
+
         assert std.max() > 0
 
 
@@ -97,13 +93,11 @@ class TestPhaseIdentifierResNet:
         assert out.shape == (2, 2)
 
 
-# ---- Analyst integration tests ----
-
 class TestAnalyst:
     def test_analyze_tile_no_models(self):
         """Analyst without models falls back to peak-finding."""
         analyst = Analyst()
-        # Create a simple tile with peaks
+
         from scipy.ndimage import gaussian_filter
         tile = np.zeros((128, 128), dtype=np.float32)
         for r in range(16, 128, 32):
@@ -153,16 +147,9 @@ class TestAnalyst:
         assert result.n_atoms == 0
 
 
-# ---- Training and evaluation tests ----
-
 @pytest.mark.training
 class TestTraining:
-    """Test that training pipeline works and produces reasonable models.
 
-    These tests use the synthetic test world (Gaussian blobs with planted
-    defects) which is much simpler than real STEM data. The accuracy
-    targets are adjusted accordingly.
-    """
 
     @pytest.fixture(scope="class")
     @classmethod
@@ -223,8 +210,8 @@ class TestTraining:
 
         atom_finder.eval()
         sample = dataset[0]
-        tile = sample["tile"].unsqueeze(0)  # (1, 1, 128, 128)
-        target = sample["atom_map"]          # (1, 128, 128)
+        tile = sample["tile"].unsqueeze(0)
+        target = sample["atom_map"]
 
         with torch.no_grad():
             mean, std = atom_finder(tile)
@@ -232,14 +219,14 @@ class TestTraining:
         pred = mean[0, 0].numpy()
         gt = target[0].numpy()
 
-        # Basic sanity: prediction should have peaks where atoms are
+
         assert pred.max() > 0.1, "Model should produce some nonzero predictions"
 
-        # Compute rough F1 via thresholded overlap
+
         pred_binary = pred > 0.3
         gt_binary = gt > 0.3
         if gt_binary.sum() > 0:
-            # Dilate both for soft matching (atoms within a few pixels)
+
             from scipy.ndimage import binary_dilation
             struct = np.ones((5, 5))
             pred_dilated = binary_dilation(pred_binary, struct)
@@ -284,7 +271,7 @@ class TestTraining:
                 total += 1
 
         accuracy = correct / max(total, 1)
-        # Most patches are "pristine" (class 0), so accuracy should be decent
+
         assert accuracy > 0.4, (
             f"DefectClassifier accuracy={accuracy:.3f}. Target: >0.4"
         )
@@ -296,7 +283,7 @@ class TestTraining:
             defect_classifier=trained_models["defect_clf"],
         )
 
-        # Analyze tiles from the test world
+
         from stem_gym.envs.world import World
         with World(TEST_WORLD) as w:
             for r in range(min(w.grid_shape[0], 3)):
@@ -316,7 +303,7 @@ class TestTraining:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Save
+
             torch.save(
                 trained_models["atom_finder"].state_dict(),
                 tmpdir / "atom_finder.pt",
@@ -326,12 +313,12 @@ class TestTraining:
                 tmpdir / "defect_classifier.pt",
             )
 
-            # Load
+
             analyst = Analyst.from_checkpoint(tmpdir)
             assert analyst.atom_finder is not None
             assert analyst.defect_classifier is not None
 
-            # Verify forward pass works
+
             tile = np.random.rand(128, 128).astype(np.float32)
             result = analyst.analyze_tile(tile)
             assert isinstance(result, AnalysisResult)

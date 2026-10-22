@@ -1,5 +1,3 @@
-"""Fetch and verify the two small software-test fixtures."""
-
 from pathlib import Path
 from stem_gym.data import download_verified, release_manifest
 

@@ -1,5 +1,3 @@
-"""Build an source archive, including frozen evidence and uv.lock."""
-
 import hashlib
 import json
 from pathlib import Path
@@ -10,7 +8,7 @@ from stem_gym.artifacts import verify_preservation
 def main():
     root = Path(__file__).resolve().parents[1]
     verify_preservation(root / "results/manuscript")
-    output = root / "dist/stemgym_source.zip"
+    output = root / "dist/stemgym_mlst_source.zip"
     output.parent.mkdir(parents=True, exist_ok=True)
     paths = [
         root / n

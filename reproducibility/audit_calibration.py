@@ -1,9 +1,3 @@
-"""Independently audit field bounds, lattice periods and image coverage.
-
-Reads original HDF5 bytes without changing them. A candidate cause is not a
-verified correction; this audit must not be used to relabel calibration.
-"""
-
 from pathlib import Path
 import hashlib, json, urllib.request
 import h5py

@@ -16,7 +16,6 @@ dependencies = [
     "numpy>=1.24",
     "h5py>=3.8",
     "scipy>=1.10",
-    # SciPy 1.15 macOS wheels fail to load on newer macOS: scipy/scipy#25635.
     "scipy==1.14.1; python_version < '3.11' and sys_platform == 'darwin'",
     "torch>=2.0",
     "botorch>=0.9",

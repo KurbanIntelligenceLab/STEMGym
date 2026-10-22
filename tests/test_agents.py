@@ -1,5 +1,3 @@
-"""Tests for baseline agents, runner, and DEC metrics integration."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,15 +26,13 @@ def world_path():
     return TEST_WORLD
 
 
-# ---- SimpleAnalyst tests ----
-
 class TestSimpleAnalyst:
     def test_peak_detection_on_blobs(self):
         """SimpleAnalyst should detect peaks in a Gaussian blob pattern."""
         from scipy.ndimage import gaussian_filter
         rng = np.random.default_rng(42)
         tile = np.zeros((128, 128), dtype=np.float32)
-        # Plant ~16 atoms in a grid pattern
+
         for r in range(16, 128, 32):
             for c in range(16, 128, 32):
                 tile[r, c] = 1.0
@@ -44,7 +40,7 @@ class TestSimpleAnalyst:
 
         analyst = SimpleAnalyst(min_distance=8, threshold_rel=0.1)
         result = analyst.analyze_tile(tile)
-        # Should find roughly 16 atoms (4x4 grid)
+
         assert result.n_atoms >= 10, f"Expected ~16 atoms, got {result.n_atoms}"
         assert result.n_atoms <= 25
 
@@ -54,7 +50,7 @@ class TestSimpleAnalyst:
         analyst.reset()
 
         from scipy.ndimage import gaussian_filter
-        # Tile with uniform atoms
+
         tile = np.zeros((128, 128), dtype=np.float32)
         for r in range(8, 128, 16):
             for c in range(8, 128, 16):
@@ -65,15 +61,13 @@ class TestSimpleAnalyst:
             analyst.analyze_tile(tile)
 
         assert analyst.get_total_atoms() > 0
-        # Census might be empty if no outliers detected (uniform tiles)
+
         census = analyst.get_defect_census()
         assert isinstance(census, dict)
 
 
-# ---- Agent protocol tests ----
-
 class TestAgentProtocol:
-    """Test that all agents implement the Agent protocol correctly."""
+
 
     @pytest.fixture(params=[
         ("random", RandomAgent),
@@ -101,7 +95,7 @@ class TestAgentProtocol:
         steps = 0
         for _ in range(200):
             action = agent.act(obs, info)
-            # Verify action is valid
+
             assert "action_type" in action
             assert "position" in action
             obs, reward, terminated, truncated, info = env.step(action)
@@ -121,7 +115,7 @@ class TestAgentProtocol:
         obs, info = env.reset(seed=42)
         agent.reset(obs, info)
 
-        # Run a few steps
+
         for _ in range(10):
             action = agent.act(obs, info)
             obs, _, term, trunc, info = env.step(action)
@@ -133,8 +127,6 @@ class TestAgentProtocol:
         assert "defect_census" in findings
         env.close()
 
-
-# ---- Runner tests ----
 
 class TestRunner:
     def test_run_episode_random(self, world_path):
@@ -148,7 +140,7 @@ class TestRunner:
         assert result.total_dose_used >= 0
         assert len(result.episode_log) > 0
         assert result.dec.auc >= 0
-        # At least the final entry should have a score
+
         scores = [e["task_score"] for e in result.episode_log if e["task_score"] is not None]
         assert len(scores) >= 1
         env.close()
@@ -179,21 +171,8 @@ class TestRunner:
         env.close()
 
 
-# ---- Baseline ordering test ----
-
 class TestBaselineOrdering:
-    """Verify baseline ordering on synthetic world.
 
-    On the uniform synthetic world, all strategies produce similar DEC-AUC
-    because the spatial structure is homogeneous. The key verifications:
-
-    1. All agents produce positive DEC-AUC (they're actually scoring)
-    2. Raster achieves high coverage when given enough budget
-    3. GP-UCB is competitive with Random (not worse by a large margin)
-
-    Strict ordering (Random < Raster < GP-UCB) is expected on
-    real abTEM-simulated worlds with spatial heterogeneity.
-    """
 
     def test_all_agents_produce_scores(self, world_path):
         """All baselines produce positive DEC-AUC — they're working."""
@@ -223,13 +202,13 @@ class TestBaselineOrdering:
             print(f"    {name:12s}: {bench.mean_dec_auc:.4f} ± {bench.std_dec_auc:.4f}"
                   f"  (tiles={bench.mean_tiles:.1f}, dose={bench.mean_dose_used:.0f})")
 
-        # All agents should produce non-negative DEC-AUC
+
         for name, bench in results.items():
             assert bench.mean_dec_auc >= 0.0, (
                 f"{name} DEC-AUC should be non-negative, got {bench.mean_dec_auc}"
             )
 
-        # All agents should acquire at least some tiles
+
         for name, bench in results.items():
             assert bench.mean_tiles > 0, f"{name} should acquire tiles"
 
@@ -268,7 +247,7 @@ class TestBaselineOrdering:
         )
         env_g.close()
 
-        # GP-UCB should be within 50% of random (they're similar on uniform world)
+
         assert gp_bench.mean_dec_auc >= random_bench.mean_dec_auc * 0.5, (
             f"GP-UCB ({gp_bench.mean_dec_auc:.4f}) should be competitive with "
             f"Random ({random_bench.mean_dec_auc:.4f})"

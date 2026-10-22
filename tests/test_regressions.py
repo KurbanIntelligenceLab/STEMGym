@@ -1,5 +1,3 @@
-"""Regression checks for acquisition order, resets, and preservation boundaries."""
-
 from pathlib import Path
 import numpy as np
 import pytest
@@ -156,6 +154,18 @@ def test_manuscript_evidence_preserved():
     ]:
         with pytest.raises(ValueError):
             writable_output(ROOT / path, ROOT)
+
+
+def test_manuscript_run_directory_is_writable(tmp_path):
+    output = tmp_path / "development/runs/mlst_reference/episodes.json"
+    assert writable_output(output, tmp_path) == output.resolve()
+    runs = tmp_path / "development/runs"
+    runs.parent.mkdir(parents=True)
+    evidence = tmp_path / "results/manuscript"
+    evidence.mkdir(parents=True)
+    runs.symlink_to(evidence, target_is_directory=True)
+    with pytest.raises(ValueError):
+        writable_output(output, tmp_path)
 
 
 @pytest.mark.parametrize(

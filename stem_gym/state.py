@@ -1,5 +1,3 @@
-"""State and declared findings for a STEMGym episode."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,55 +8,48 @@ import numpy as np
 
 @dataclass
 class Finding:
-    """A single declared finding from the agent."""
-    finding_type: str          # e.g. "vacancy", "substitution", "phase_boundary"
-    position: tuple[float, float]  # (x_nm, y_nm) in world coordinates
+
+    finding_type: str
+    position: tuple[float, float]
     confidence: float = 1.0
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ExperimentState:
-    """Environment state and accumulated analysis outputs.
 
-    This is the central state object that all agents read from and write to.
-    It is NOT the Gymnasium observation — the env constructs obs from this +
-    the world data.
-    """
 
-    # --- World metadata ---
     world_name: str = ""
-    world_shape: tuple[int, int] = (0, 0)  # (H, W) in pixels
-    pixel_size_nm: float = 0.0             # nm per pixel
-    fov_nm: tuple[float, float] = (0.0, 0.0)  # (H_nm, W_nm)
+    world_shape: tuple[int, int] = (0, 0)
+    pixel_size_nm: float = 0.0
+    fov_nm: tuple[float, float] = (0.0, 0.0)
 
-    # --- Budget tracking ---
-    total_budget: float = 1e6     # total electron dose budget (e⁻/Å²)
-    dose_used: float = 0.0        # cumulative dose spent
-    step_count: int = 0           # environment steps taken
-    max_steps: int = 200          # episode step limit
 
-    # --- Agent position ---
-    position: tuple[float, float] = (0.0, 0.0)  # (x_nm, y_nm) current probe center
+    total_budget: float = 1e6
+    dose_used: float = 0.0
+    step_count: int = 0
+    max_steps: int = 200
 
-    # --- Coverage tracking ---
-    # Boolean mask: which tiles have been acquired (on the tile grid)
+
+    position: tuple[float, float] = (0.0, 0.0)
+
+
     visited_mask: np.ndarray | None = None
-    # Float mask: accumulated dose per tile position
+
     dose_map: np.ndarray | None = None
-    # Number of unique tiles acquired
+
     tiles_acquired: int = 0
-    acquisitions: int = 0  # All successful acquisitions, including revisits
+    acquisitions: int = 0
 
-    # --- Analyst outputs ---
-    atom_positions: np.ndarray | None = None    # (N, 2) detected atom positions
-    atom_confidences: np.ndarray | None = None  # (N,) confidence per atom
-    defect_census: dict[str, int] = field(default_factory=dict)  # type -> count
+
+    atom_positions: np.ndarray | None = None
+    atom_confidences: np.ndarray | None = None
+    defect_census: dict[str, int] = field(default_factory=dict)
     defect_positions: list[Finding] = field(default_factory=list)
-    phase_map: np.ndarray | None = None         # (H, W) phase labels
-    confidence_map: np.ndarray | None = None    # (H, W) analyst confidence
+    phase_map: np.ndarray | None = None
+    confidence_map: np.ndarray | None = None
 
-    # --- Agent findings (for task scoring) ---
+
     findings: list[Finding] = field(default_factory=list)
     declared_phase_map: np.ndarray | None = None
 

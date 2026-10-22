@@ -1,11 +1,10 @@
-"""Download and verify benchmark worlds and analyst checkpoints."""
 import argparse
 from pathlib import Path
 from stem_gym.data import download_verified, release_manifest
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Download and verify STEMGym worlds and checkpoints.')
     parser.add_argument('--worlds', action='store_true')
     parser.add_argument('--checkpoints', action='store_true')
     parser.add_argument('--test-only', action='store_true')

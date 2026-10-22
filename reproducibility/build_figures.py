@@ -1,5 +1,3 @@
-"""Generate figures and tables from released records and evaluation logs."""
-
 from pathlib import Path
 import argparse, json
 import numpy as np
@@ -263,7 +261,7 @@ def result_figures(results_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description='Generate figures and tables from evaluation results.')
     parser.add_argument("--data-only", action="store_true")
     parser.add_argument(
         "--results",

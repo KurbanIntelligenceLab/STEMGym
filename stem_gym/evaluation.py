@@ -1,5 +1,3 @@
-"""Reference policies composed with the shared synchronous episode runner."""
-
 from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
@@ -48,7 +46,7 @@ class EvaluationConfig:
 
 
 class ReferenceAgent(Agent):
-    """Compose a policy with an analyst; process each acquired image once."""
+
 
     def __init__(self, policy: str, analyst, config: EvaluationConfig):
         if policy not in POLICIES:

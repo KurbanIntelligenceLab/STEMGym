@@ -1,5 +1,3 @@
-"""STEMEnv: Gymnasium environment for autonomous STEM microscopy."""
-
 from __future__ import annotations
 
 from enum import IntEnum
@@ -16,36 +14,19 @@ from stem_gym.tasks import DummyTask, Task
 
 
 class ActionType(IntEnum):
-    NAVIGATE = 0   # Move probe — free (no dose cost)
-    ACQUIRE = 1    # Acquire tile — costs dose
-    DECLARE = 2    # Declare a finding
-    DONE = 3       # End episode
+    NAVIGATE = 0
+    ACQUIRE = 1
+    DECLARE = 2
+    DONE = 3
 
 
-# Default acquisition parameters
 DEFAULT_TILE_SIZE_PX = 128
 DEFAULT_DWELL_US = 1.0
-DEFAULT_DOSE_PER_ACQUIRE = 100.0  # e⁻/Å² per acquisition
+DEFAULT_DOSE_PER_ACQUIRE = 100.0
 
 
 class STEMEnv(gym.Env):
-    """Gymnasium environment for the STEMGym benchmark.
 
-    Action space (Dict):
-        action_type: Discrete(4) — NAVIGATE, ACQUIRE, DECLARE, DONE
-        position: Box(2) — (x_nm, y_nm) target position (used by NAVIGATE)
-        zoom: Box(1) — zoom level 1-4 (used by ACQUIRE)
-        dwell: Box(1) — dwell time multiplier (used by ACQUIRE)
-        finding_type: Discrete(8) — defect/phase class (used by DECLARE)
-
-    Observation space (Dict):
-        tile: Box(tile_size, tile_size) — last acquired tile (zeros if none)
-        overview: Box(64, 64) — overview crop around current position
-        position: Box(2) — current (x_nm, y_nm)
-        budget_remaining: Box(1) — fraction of budget remaining [0, 1]
-        step_count: Box(1) — fraction of max steps used [0, 1]
-        visited_mask: Box(grid_h, grid_w) — binary mask of visited tiles
-    """
 
     metadata = {"render_modes": ["human", "rgb_array"]}
 
@@ -82,16 +63,16 @@ class STEMEnv(gym.Env):
         self.overview_size = overview_size
         self.render_mode = render_mode
 
-        # World geometry
+
         grid_h, grid_w = self.world.grid_shape
         tile_size = self.world.tile_size_px
         fov_h, fov_w = self.world.fov_nm
 
-        # State template
+
         self._init_budget = total_budget
         self._init_max_steps = max_steps
 
-        # --- Action space (MineRL-style Dict) ---
+
         self.action_space = spaces.Dict({
             "action_type": spaces.Discrete(4),
             "position": spaces.Box(
@@ -103,7 +84,7 @@ class STEMEnv(gym.Env):
             "finding_type": spaces.Discrete(8),
         })
 
-        # --- Observation space ---
+
         self.observation_space = spaces.Dict({
             "tile": spaces.Box(
                 low=0.0, high=np.inf, shape=(tile_size, tile_size), dtype=np.float32,
@@ -127,7 +108,7 @@ class STEMEnv(gym.Env):
             ),
         })
 
-        # State
+
         self.state: ExperimentState | None = None
         self._last_tile: np.ndarray = np.zeros((tile_size, tile_size), dtype=np.float32)
         self._terminated = False
@@ -152,7 +133,7 @@ class STEMEnv(gym.Env):
             dose_used=0.0,
             step_count=0,
             max_steps=self._init_max_steps,
-            position=(self.world.fov_nm[1] / 2, self.world.fov_nm[0] / 2),  # center
+            position=(self.world.fov_nm[1] / 2, self.world.fov_nm[0] / 2),
             visited_mask=np.zeros((grid_h, grid_w), dtype=bool),
             dose_map=np.zeros((grid_h, grid_w), dtype=np.float32),
             tiles_acquired=0,
@@ -189,7 +170,7 @@ class STEMEnv(gym.Env):
             "fov_nm": s.fov_nm,
             "grid_shape": self.world.grid_shape,
             "pixel_size_nm": s.pixel_size_nm,
-            "task_score": None,  # filled on episode end
+            "task_score": None,
         }
 
     def reset(
@@ -231,7 +212,7 @@ class STEMEnv(gym.Env):
         s = self.state
         reward = 0.0
 
-        # DECLARE is zero-cost: no step count, no dose, just an annotation
+
         if action_type == ActionType.DECLARE:
             finding_type_idx = int(action.get("finding_type", 0))
             finding_types = [
@@ -246,32 +227,32 @@ class STEMEnv(gym.Env):
             ))
             return self._get_obs(), 0.0, self._terminated, self._truncated, self._get_info()
 
-        # All non-DECLARE actions consume a step
+
         s.step_count += 1
 
         if action_type == ActionType.NAVIGATE:
-            # Move probe — free
+
             pos = action["position"]
             x = float(np.clip(pos[0], 0, s.fov_nm[1]))
             y = float(np.clip(pos[1], 0, s.fov_nm[0]))
             s.position = (x, y)
 
         elif action_type == ActionType.ACQUIRE:
-            # Acquire tile at current position — costs dose
+
             zoom = float(action.get("zoom", [1.0])[0]) if "zoom" in action else 1.0
             dwell = float(action.get("dwell", [1.0])[0]) if "dwell" in action else 1.0
             dose_cost = self.dose_per_acquire * dwell * (zoom ** 2)
 
             if s.budget_remaining >= dose_cost:
-                # Get tile at current position
+
                 row, col = self.world.nm_to_tile(*s.position)
                 clean_tile = self.world.get_tile(row, col)
 
-                # Apply noise based on dose
+
                 noisy_tile = self.world.apply_poisson_noise(clean_tile, dose_cost)
                 self._last_tile = noisy_tile
 
-                # Update bookkeeping
+
                 s.acquisitions += 1
                 s.dose_used += dose_cost
                 s.dose_map[row, col] += dose_cost
@@ -279,24 +260,24 @@ class STEMEnv(gym.Env):
                     s.visited_mask[row, col] = True
                     s.tiles_acquired += 1
             else:
-                # Not enough budget — no-op
+
                 pass
 
         elif action_type == ActionType.DONE:
-            # Agent declares episode finished
+
             self._terminated = True
 
-        # Check termination conditions
+
         if s.budget_remaining <= 0:
             self._terminated = True
         if s.step_count >= s.max_steps:
             self._truncated = True
 
-        # Score on episode end
+
         info = self._get_info()
         if self._terminated or self._truncated:
             gt = self.world.get_ground_truth()
-            # Filter GT to explored region for atom-level tasks
+
             if self.task.name != "phase_mapping":
                 from stem_gym.scoring import filter_gt_to_explored
                 gt = filter_gt_to_explored(gt, s.visited_mask, self.world)
